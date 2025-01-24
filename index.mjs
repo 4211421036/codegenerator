@@ -15,7 +15,8 @@ function preprocessData(folderPath) {
 }
 
 function tokenize(text) {
-    return text.split(/\s+/).map((_, i) => i).slice(0, 50);
+    // Tokenisasi sebenarnya dengan membagi teks menjadi token
+    return text.split(/\s+/).slice(0, 50);
 }
 
 function createTrainingData(data) {
@@ -24,52 +25,59 @@ function createTrainingData(data) {
     const maxLength = 50;
     const numClasses = 1000;
 
+    // Buat vocabulary dari semua token
+    const allTokens = new Set();
+
     data.forEach(({ input, output }) => {
         const inputTokens = tokenize(input);
         const outputTokens = tokenize(output);
 
-        const paddedInput = [...inputTokens, ...Array(maxLength - inputTokens.length).fill(0)].slice(0, maxLength);
-        const paddedOutput = [...outputTokens, ...Array(maxLength - outputTokens.length).fill(0)].slice(0, maxLength);
+        // Tambahkan token ke vocabulary
+        inputTokens.forEach(token => allTokens.add(token));
+        outputTokens.forEach(token => allTokens.add(token));
+
+        // Padding tokens
+        const paddedInput = [...inputTokens, ...Array(maxLength - inputTokens.length).fill('<PAD>')].slice(0, maxLength);
+        const paddedOutput = [...outputTokens, ...Array(maxLength - outputTokens.length).fill('<PAD>')].slice(0, maxLength);
         
         inputs.push(paddedInput);
         outputs.push(paddedOutput);
     });
 
-    const flattenedInputs = inputs.reduce((acc, curr) => acc.concat(curr), []);
-    const vocab = { vocabulary: Array.from(new Set(flattenedInputs)) };
+    // Buat vocabulary dari token unik
+    const vocab = { 
+        vocabulary: Array.from(allTokens),
+        total_tokens: allTokens.size
+    };
     
-    // Debug: Log direktori kerja saat ini
-    console.log('Current working directory:', process.cwd());
-
-    // Pastikan direktori ada
+    // Simpan vocab
     const modelDir = path.resolve('./ai_model');
-    console.log('Model directory path:', modelDir);
-
-    try {
-        fs.mkdirSync(modelDir, { recursive: true });
-    } catch (err) {
-        console.error('Error creating directory:', err);
-    }
-
     const vocabPath = path.join(modelDir, 'vocab.json');
     
     try {
-        fs.writeFileSync(vocabPath, JSON.stringify(vocab));
-        console.log("Vocabulary created and saved as vocab.json at:", vocabPath);
+        fs.writeFileSync(vocabPath, JSON.stringify(vocab, null, 2));
+        console.log("Vocabulary created and saved. Total unique tokens:", allTokens.size);
     } catch (err) {
         console.error('Error saving vocab.json:', err);
     }
 
+    // Proses one-hot encoding dengan mapping token ke indeks
+    const tokenToIndex = new Map(Array.from(allTokens).map((token, index) => [token, index]));
+    
     const oneHotEncodedOutputs = outputs.map(output =>
         output.map(token => {
             const oneHot = Array(numClasses).fill(0);
-            oneHot[token] = 1;
+            const index = tokenToIndex.get(token) || 0;
+            oneHot[index] = 1;
             return oneHot;
         })
     );
 
     return {
-        inputs: tf.tensor2d(inputs, [inputs.length, maxLength]),
+        inputs: tf.tensor2d(
+            inputs.map(input => input.map(token => tokenToIndex.get(token) || 0)), 
+            [inputs.length, maxLength]
+        ),
         outputs: tf.tensor3d(oneHotEncodedOutputs, [outputs.length, maxLength, numClasses]),
     };
 }
