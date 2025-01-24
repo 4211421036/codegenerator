@@ -101,27 +101,36 @@ async function trainAndSaveModel(folderPath, outputModelPath) {
     const { inputs, outputs, vocab } = createTrainingData(rawData); // Get vocab here
 
     const model = tf.sequential();
-    model.add(tf.layers.lstm({ units: 256, returnSequences: true }));
+
+    // Define the model layers with correct inputShape
+    model.add(tf.layers.embedding({ 
+        inputDim: vocab.total_tokens, 
+        outputDim: 64, 
+        inputLength: 50 
+    }));
+    model.add(tf.layers.lstm({ 
+        units: 256, 
+        returnSequences: true, 
+        inputShape: [50, vocab.total_tokens] // Defining input shape for the first LSTM layer
+    }));
     model.add(tf.layers.lstm({ units: 128, returnSequences: true }));
     model.add(tf.layers.dense({ units: 1000, activation: 'softmax' }));
-    model.add(tf.layers.embedding({ inputDim: vocab.total_tokens, outputDim: 64, inputLength: 50 }));
     model.add(tf.layers.lstm({ units: 128, returnSequences: true }));
     model.add(tf.layers.dense({ units: vocab.total_tokens, activation: 'softmax' }));
 
-    model.compile({ loss: 'categoricalCrossentropy', optimizer: tf.train.sgd(0.01) });
+    model.compile({ loss: 'categoricalCrossentropy', optimizer: tf.train.adam(0.001) });
 
     console.log('Training model...');
     await model.fit(inputs, outputs, {
         epochs: 20,
-        batchSize: 32,  // Coba ukuran batch yang berbeda
+        batchSize: 32,  // You can try different batch sizes for better results
     });
-
 
     console.log('Saving model...');
     await model.save(`file://${outputModelPath}`);
     console.log('Model saved to', outputModelPath);
 }
 
-const folderPath = './arduino_code';
-const outputModelPath = './ai_model';
+const folderPath = './arduino_code';  // Path to your .ino files
+const outputModelPath = './ai_model'; // Path where the trained model will be saved
 trainAndSaveModel(folderPath, outputModelPath);
