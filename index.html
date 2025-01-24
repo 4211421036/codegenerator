@@ -74,7 +74,10 @@
         // Preprocess input untuk dimasukkan ke model
         function preprocessInput(inputText) {
             const tokenizedInput = tokenize(inputText);
-            return tf.tensor2d([tokenizedInput]);
+            
+            // Pastikan panjang token selalu 50 (pad dengan 0 jika perlu)
+            const paddedInput = padInput(tokenizedInput, 50);
+            return tf.tensor2d([paddedInput]);
         }
 
         // Fungsi tokenisasi untuk input (contoh sederhana, bisa dikembangkan)
@@ -82,9 +85,18 @@
             return text.split(/\s+/).map((_, i) => i).slice(0, 50);  // Tokenisasi sederhana dengan batas 50 token
         }
 
+        // Fungsi untuk menambah padding agar panjang input selalu 50
+        function padInput(input, length) {
+            const paddedInput = [...input];
+            while (paddedInput.length < length) {
+                paddedInput.push(0);  // Padding dengan 0
+            }
+            return paddedInput.slice(0, length);  // Memastikan panjangnya tepat 50
+        }
+
         // Fungsi untuk mendekode output dari model
         function decodeOutput(output) {
-            // Simpan implementasi untuk mendekode hasil output ke bentuk code yang lebih manusiawi
+            // Mengonversi output menjadi string kode Arduino yang relevan
             // Di sini kita hanya mengembalikan output sebagai string
             return output.join(' ');
         }
