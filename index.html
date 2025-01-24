@@ -26,7 +26,7 @@
         async function loadModel() {
             try {
                 // Ganti dengan path ke model Anda (URL atau lokal)
-                model = await tf.loadLayersModel('model/model.json');
+                model = await tf.loadLayersModel('ai_model/model.json');
                 console.log('Model Loaded');
             } catch (error) {
                 console.error("Model failed to load", error);
