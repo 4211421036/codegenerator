@@ -1,7 +1,7 @@
 name: Train and Deploy AI Model
 on:
   schedule:
-    - cron: '0 0 * * *'  # Running at midnight every day
+    - cron: '0 0 * * *'
   push:
     branches:
       - main
@@ -25,18 +25,20 @@ jobs:
     - name: Run AI Model Training Script
       run: node index.mjs
     
-    - name: Debug AI Model Output
+    - name: Debug AI Model Files
       run: |
-        ls -l ai_model
+        find . -name vocab.json
+        ls -l ai_model/
         cat ai_model/model.json
-        cat ai_model/vocab.json
+        [ -f ai_model/vocab.json ] && cat ai_model/vocab.json || echo "vocab.json not found"
     
     - name: Commit and push trained model
       run: |
         git config --global user.name "GitHub Actions"
         git config --global user.email "actions@github.com"
         
-        git add ai_model/
+        # Explicitly add all files in ai_model, including vocab.json
+        git add ai_model/model.json ai_model/weights.bin ai_model/vocab.json
         
         if git diff --cached --quiet; then
           echo "No changes to commit"
@@ -49,4 +51,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: ai-model
-        path: ./ai_model
+        path: |
+          ai_model/model.json
+          ai_model/weights.bin
+          ai_model/vocab.json
