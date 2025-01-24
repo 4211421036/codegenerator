@@ -9,7 +9,6 @@ function preprocessData(folderPath) {
     files.forEach(file => {
         if (file.endsWith('.ino')) {
             const content = fs.readFileSync(path.join(folderPath, file), 'utf8');
-            // Preserve code structure
             data.push({ 
                 input: file.replace('.ino', ''), 
                 output: content.trim()
@@ -19,33 +18,58 @@ function preprocessData(folderPath) {
     return data;
 }
 
-function advancedTokenize(text) {
-    // Preserve code structure and meaningful tokens
-    return text
+function advancedTokenize(text, maxLength = 100) {
+    // Split into meaningful tokens, preserving code structure
+    const tokens = text
         .split(/\n/)
         .map(line => line.trim())
-        .filter(line => line.length > 0 && !line.startsWith('//'));
+        .filter(line => line.length > 0 && !line.startsWith('//'))
+        .slice(0, maxLength);
+    
+    return tokens;
 }
 
 function createTrainingData(data) {
-    const maxLength = 100;  // Increased to capture more context
-    const inputs = [];
-    const outputs = [];
-    const allTokens = new Set();
+    const maxLength = 100;
+    const allTokens = new Set(['<PAD>']); // Add padding token
 
+    // Collect all unique tokens first
     data.forEach(({ input, output }) => {
         const inputTokens = advancedTokenize(input);
         const outputTokens = advancedTokenize(output);
 
         inputTokens.forEach(token => allTokens.add(token));
         outputTokens.forEach(token => allTokens.add(token));
+    });
 
-        // Pad or truncate tokens while maintaining structure
-        const paddedInput = inputTokens.slice(0, maxLength);
-        const paddedOutput = outputTokens.slice(0, maxLength);
+    const tokenToIndex = new Map(
+        Array.from(allTokens).map((token, index) => [token, index])
+    );
 
-        inputs.push(paddedInput);
-        outputs.push(paddedOutput);
+    const inputs = [];
+    const outputs = [];
+
+    data.forEach(({ input, output }) => {
+        // Tokenize and pad input
+        const inputTokens = advancedTokenize(input, maxLength);
+        const paddedInput = [
+            ...inputTokens, 
+            ...Array(maxLength - inputTokens.length).fill('<PAD>')
+        ].slice(0, maxLength);
+
+        // Tokenize and pad output
+        const outputTokens = advancedTokenize(output, maxLength);
+        const paddedOutput = [
+            ...outputTokens, 
+            ...Array(maxLength - outputTokens.length).fill('<PAD>')
+        ].slice(0, maxLength);
+
+        // Convert tokens to indices
+        const inputIndices = paddedInput.map(token => tokenToIndex.get(token) || 0);
+        const outputIndices = paddedOutput.map(token => tokenToIndex.get(token) || 0);
+
+        inputs.push(inputIndices);
+        outputs.push(outputIndices);
     });
 
     const vocab = {
@@ -53,19 +77,9 @@ function createTrainingData(data) {
         total_tokens: allTokens.size
     };
 
-    const tokenToIndex = new Map(
-        Array.from(allTokens).map((token, index) => [token, index])
-    );
-
     return {
-        inputs: tf.tensor2d(
-            inputs.map(input => input.map(token => tokenToIndex.get(token) || 0)),
-            [inputs.length, maxLength]
-        ),
-        outputs: tf.tensor2d(
-            outputs.map(output => output.map(token => tokenToIndex.get(token) || 0)),
-            [outputs.length, maxLength]
-        ),
+        inputs: tf.tensor2d(inputs, [inputs.length, maxLength]),
+        outputs: tf.tensor2d(outputs, [outputs.length, maxLength]),
         vocab: vocab
     };
 }
