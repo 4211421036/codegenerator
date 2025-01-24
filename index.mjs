@@ -38,16 +38,27 @@ function createTrainingData(data) {
     const flattenedInputs = inputs.reduce((acc, curr) => acc.concat(curr), []);
     const vocab = { vocabulary: Array.from(new Set(flattenedInputs)) };
     
-    // Ensure ai_model directory exists
-    const modelDir = './ai_model';
-    if (!fs.existsSync(modelDir)){
-        fs.mkdirSync(modelDir);
+    // Debug: Log direktori kerja saat ini
+    console.log('Current working directory:', process.cwd());
+
+    // Pastikan direktori ada
+    const modelDir = path.resolve('./ai_model');
+    console.log('Model directory path:', modelDir);
+
+    try {
+        fs.mkdirSync(modelDir, { recursive: true });
+    } catch (err) {
+        console.error('Error creating directory:', err);
     }
 
-    // Save vocabulary to file in ai_model directory
     const vocabPath = path.join(modelDir, 'vocab.json');
-    fs.writeFileSync(vocabPath, JSON.stringify(vocab));
-    console.log("Vocabulary created and saved as vocab.json");
+    
+    try {
+        fs.writeFileSync(vocabPath, JSON.stringify(vocab));
+        console.log("Vocabulary created and saved as vocab.json at:", vocabPath);
+    } catch (err) {
+        console.error('Error saving vocab.json:', err);
+    }
 
     const oneHotEncodedOutputs = outputs.map(output =>
         output.map(token => {
