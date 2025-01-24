@@ -27,6 +27,8 @@ jobs:
 
     - name: Create Model and Vocabulary
       run: |
+        # Ensure ai_model directory exists
+        mkdir -p ai_model
         node index.mjs  # Replace with your script for AI model training
 
     - name: Verify Model and Vocabulary Creation
