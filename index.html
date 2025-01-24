@@ -4,79 +4,96 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Code Generator</title>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@2.10.0"></script> <!-- TensorFlow.js -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script> <!-- Memuat TensorFlow.js -->
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+        input, button {
+            padding: 10px;
+            margin: 10px;
+        }
+        #output {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #f0f0f0;
+            border-radius: 5px;
+        }
+    </style>
 </head>
 <body>
-    <h1>Arduino Code Generator</h1>
-    <p>Masukkan input yang diperlukan untuk menghasilkan kode Arduino (.ino):</p>
-
-    <form id="codeForm">
-        <label for="inputText">Deskripsi kode:</label>
-        <textarea id="inputText" rows="5" cols="50" placeholder="Masukkan deskripsi atau permintaan untuk kode Arduino"></textarea><br><br>
-        <button type="submit">Generate Kode</button>
-    </form>
-
-    <h2>Output Kode Arduino (.ino)</h2>
-    <pre id="outputCode"></pre>
+    <h1>Code Generator AI</h1>
+    
+    <label for="userInput">Masukkan Input (Deskripsi):</label>
+    <textarea id="userInput" rows="4" cols="50"></textarea>
+    
+    <br>
+    
+    <button id="generateCodeButton">Generate Code</button>
+    
+    <div id="output"></div>
 
     <script>
         let model;
 
-        // Fungsi untuk memuat model yang telah dilatih
+        // Fungsi untuk memuat model dari URL
         async function loadModel() {
             try {
-                // Ganti dengan path ke model Anda (URL atau lokal)
-                model = await tf.loadLayersModel('ai_model/model.json');
-                console.log('Model Loaded');
+                console.log("Mencoba memuat model...");
+                model = await tf.loadLayersModel('https://4211421036.github.io/codegenerator/ai_model/model.json');
+                console.log("Model berhasil dimuat.");
             } catch (error) {
-                console.error("Model failed to load", error);
+                console.error("Gagal memuat model:", error);
             }
         }
 
-        // Fungsi untuk menghasilkan kode berdasarkan input
-        async function generateCode(inputText) {
-            if (!model) {
-                console.error('Model belum dimuat!');
+        // Fungsi untuk memproses input pengguna
+        async function generateCode() {
+            const userInput = document.getElementById("userInput").value;
+
+            if (!userInput.trim()) {
+                alert("Masukkan deskripsi terlebih dahulu.");
                 return;
             }
 
-            // Tokenize dan pre-process input (seperti yang telah Anda lakukan di script sebelumnya)
-            const tokenizedInput = tokenizeInput(inputText);
-            const inputTensor = tf.tensor2d([tokenizedInput], [1, 50]);
+            // Tokenisasi dan preprocess input
+            const inputTensor = preprocessInput(userInput);
 
-            // Prediksi menggunakan model
+            // Membuat prediksi dari model
             const prediction = model.predict(inputTensor);
-            const outputTokens = prediction.argMax(-1).dataSync();  // Ambil token yang diprediksi
-            const generatedCode = decodeOutput(outputTokens);
 
-            return generatedCode;
+            // Ambil output dari model dan tampilkan hasilnya
+            const output = await prediction.data();
+            const generatedCode = decodeOutput(output);
+            
+            // Menampilkan hasil prediksi
+            document.getElementById("output").textContent = generatedCode;
         }
 
-        // Tokenisasi input (sesuaikan dengan tokenisasi yang digunakan saat pelatihan)
-        function tokenizeInput(text) {
-            // Proses tokenisasi sederhana, sesuaikan dengan model Anda
-            const tokens = text.split(/\s+/).map((_, i) => i);  // Simplified tokenization
-            return tokens.slice(0, 50).concat(Array(50 - tokens.length).fill(0));  // Pad to 50 tokens
+        // Preprocess input untuk dimasukkan ke model
+        function preprocessInput(inputText) {
+            const tokenizedInput = tokenize(inputText);
+            return tf.tensor2d([tokenizedInput]);
         }
 
-        // Decode output menjadi kode .ino
-        function decodeOutput(outputTokens) {
-            // Mengubah token kembali ke teks atau kode sesuai dengan model Anda
-            return outputTokens.join(' ');  // Simpan sebagai string, Anda bisa mengganti ini dengan proses lain
+        // Fungsi tokenisasi untuk input (contoh sederhana, bisa dikembangkan)
+        function tokenize(text) {
+            return text.split(/\s+/).map((_, i) => i).slice(0, 50);  // Tokenisasi sederhana dengan batas 50 token
         }
 
-        // Event listener untuk form
-        document.getElementById('codeForm').addEventListener('submit', async (event) => {
-            event.preventDefault();
-            const inputText = document.getElementById('inputText').value;
-            const outputCode = await generateCode(inputText);
+        // Fungsi untuk mendekode output dari model
+        function decodeOutput(output) {
+            // Simpan implementasi untuk mendekode hasil output ke bentuk code yang lebih manusiawi
+            // Di sini kita hanya mengembalikan output sebagai string
+            return output.join(' ');
+        }
 
-            // Tampilkan kode yang dihasilkan di layar
-            document.getElementById('outputCode').textContent = outputCode;
-        });
+        // Event listener untuk tombol Generate Code
+        document.getElementById("generateCodeButton").addEventListener("click", generateCode);
 
-        // Memuat model saat halaman dimuat
-        loadModel();
+        // Memuat model ketika halaman dimuat
+        window.onload = loadModel;
     </script>
 </body>
 </html>
