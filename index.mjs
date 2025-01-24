@@ -25,19 +25,13 @@ function createTrainingData(data) {
     const inputs = [];
     const outputs = [];
 
-    let maxLength = 0;
+    const maxLength = 50; // Set maxLength directly to 50 to ensure the output is of the correct shape
 
     data.forEach(({ input, output }) => {
         const inputTokens = tokenize(input);
         const outputTokens = tokenize(output);
-        maxLength = Math.max(maxLength, inputTokens.length, outputTokens.length);
 
-        // Check if maxLength is valid
-        if (maxLength <= 0) {
-            throw new Error("Invalid maxLength value.");
-        }
-
-        // Pad or truncate to a fixed size (e.g., 50 tokens)
+        // Pad or truncate to the max length (50 tokens)
         const paddedInput = [...inputTokens, ...Array(maxLength - inputTokens.length).fill(0)].slice(0, maxLength);
         const paddedOutput = [...outputTokens, ...Array(maxLength - outputTokens.length).fill(0)].slice(0, maxLength);
 
