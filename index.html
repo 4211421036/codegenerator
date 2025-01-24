@@ -24,30 +24,31 @@
             }
         }
 
-        function prepareInput(text) {
+        function prepareInput(text, maxLength = 100) {
             // Tokenize input, preserve structure
-            return text.toLowerCase()
+            const tokens = text.toLowerCase()
                 .split(/\s+/)
-                .filter(token => token.length > 0)
-                .slice(0, 100);
+                .filter(token => token.length > 0);
+
+            // Pad or truncate to maxLength
+            const paddedTokens = tokens.slice(0, maxLength);
+            while (paddedTokens.length < maxLength) {
+                paddedTokens.push('<PAD>');
+            }
+
+            // Convert to indices
+            return paddedTokens.map(token => 
+                vocab.vocabulary.indexOf(token) !== -1 
+                    ? vocab.vocabulary.indexOf(token) 
+                    : 0
+            );
         }
 
         function decodeOutput(outputTensor) {
             const outputIndices = Array.from(outputTensor.argMax(-1).dataSync());
             const tokens = outputIndices
                 .map(index => vocab.vocabulary[index] || '')
-                .filter(token => token !== '');
-
-            // Reconstruct code with basic Arduino template
-            const reconstructedCode = [
-                "void setup() {",
-                "  // Setup code based on your description",
-                "}",
-                "",
-                "void loop() {",
-                "  // Generated loop logic",
-                "}"
-            ];
+                .filter(token => token !== '<PAD>');
 
             return tokens.join(' ');
         }
@@ -55,7 +56,12 @@
         async function generateCode() {
             const input = document.getElementById('userInput').value;
             const processedInput = prepareInput(input);
-            const inputTensor = tf.tensor2d([processedInput], [1, 100]);
+            
+            // Ensure tensor is 2D with correct shape
+            const inputTensor = tf.tensor2d(
+                [processedInput], 
+                [1, processedInput.length]
+            );
 
             try {
                 const prediction = model.predict(inputTensor);
