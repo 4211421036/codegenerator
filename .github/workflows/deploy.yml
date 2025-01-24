@@ -1,7 +1,7 @@
 name: Train and Deploy AI Model
 on:
   schedule:
-    - cron: '0 0 * * *'  # Running at midnight every day, adjust as needed
+    - cron: '0 0 * * *'  # Running at midnight every day
   push:
     branches:
       - main
@@ -11,38 +11,42 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v3
+    
     - name: Setup Node.js
       uses: actions/setup-node@v3
       with:
         node-version: '16'
+    
     - name: Install dependencies
       run: |
-        npm install
-        npm install @tensorflow/tfjs-node  # Install TensorFlow for Node.js
+        npm init -y
+        npm install @tensorflow/tfjs-node
+    
     - name: Run AI Model Training Script
-      run: node index.mjs  # Replace with your script for AI model training
+      run: node index.mjs
+    
     - name: Debug AI Model Output
       run: |
-        # Optionally, you can add a command to inspect the output model directory
-        ls -l ai_model  # Adjust if the model is stored in a different directory
-        cat ai_model/model.json  # Display part of the model file (for example)
+        ls -l ai_model
+        cat ai_model/model.json
+        cat ai_model/vocab.json
+    
     - name: Commit and push trained model
       run: |
         git config --global user.name "GitHub Actions"
         git config --global user.email "actions@github.com"
         
-        # Stage all modified files (including the trained model)
         git add ai_model/
         
-        # Check if there are any changes before committing
         if git diff --cached --quiet; then
           echo "No changes to commit"
         else
-          git commit -m "Add trained AI model"
+          git commit -m "Update AI model and vocabulary"
           git push
         fi
-    - name: Upload model as artifact (optional)
+    
+    - name: Upload model as artifact
       uses: actions/upload-artifact@v3
       with:
         name: ai-model
-        path: ./ai_model  # Path to the folder containing your trained model
+        path: ./ai_model
