@@ -20,7 +20,7 @@ jobs:
         npm install
         npm install @tensorflow/tfjs-node  # Install TensorFlow for Node.js
     - name: Run AI Model Training Script
-      run: node trainModel.js  # Replace with your script for AI model training
+      run: node index.mjs  # Replace with your script for AI model training
     - name: Debug AI Model Output
       run: |
         # Optionally, you can add a command to inspect the output model directory
