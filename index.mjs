@@ -16,15 +16,15 @@ function preprocessData(folderPath) {
 }
 
 function tokenize(text) {
-    const cleanedText = text.replace(/\/\/.*$/gm, '')
-                            .replace(/\/\*[\s\S]*?\*\//g, '')
-                            .replace(/\s+/g, ' ') 
-                            .replace(/([{}();,=+\-*/<>_&|^%!~?])/g, ' $1 ') 
-                            .replace(/\s+/g, ' ') 
-                            .trim(); 
+    const cleanedText = text.replace(/\/\/.*$/gm, '')               // Hapus komentar satu baris
+                            .replace(/\/\*[\s\S]*?\*\//g, '')      // Hapus komentar blok
+                            .replace(/\s+/g, ' ')                  // Gabungkan spasi
+                            .replace(/([{}();,=+\-*/<>_&|^%!~?])/g, ' $1 ')  // Beri spasi di sekitar simbol
+                            .replace(/\s+/g, ' ')                  // Bersihkan spasi ekstra
+                            .trim();                               // Hapus spasi di awal dan akhir
 
-    const tokens = cleanedText.split(' ');
-    return tokens.filter(token => token.length > 0); 
+    const tokens = cleanedText.split(' '); // Pisahkan berdasarkan spasi
+    return tokens.filter(token => token.length > 0); // Hapus token kosong
 }
 
 function createTrainingData(data) {
@@ -44,13 +44,13 @@ function createTrainingData(data) {
         const paddedInput = [...inputTokens, ...Array(maxLength - inputTokens.length).fill('<PAD>')].slice(0, maxLength);
         const paddedOutput = outputTokens.length < maxLength
             ? [...outputTokens, ...Array(maxLength - outputTokens.length).fill('<PAD>')].slice(0, maxLength)
-            : outputTokens.slice(0, maxLength); 
+            : outputTokens.slice(0, maxLength);
 
         inputs.push(paddedInput);
         outputs.push(paddedOutput);
     });
 
-    const vocab = { 
+    const vocab = {
         vocabulary: Array.from(allTokens),
         total_tokens: allTokens.size
     };
@@ -86,24 +86,25 @@ function createTrainingData(data) {
 }
 
 function exactMatchLoss(yTrue, yPred) {
-    return tf.losses.meanSquaredError(yTrue, yPred);
+    // Loss untuk matching yang lebih baik, menggunakan binary cross entropy
+    return tf.losses.binaryCrossentropy(yTrue, yPred);
 }
 
 async function trainAndSaveModel(folderPath, outputModelPath) {
     const rawData = preprocessData(folderPath);
-    const { inputs, outputs, vocab } = createTrainingData(rawData); 
+    const { inputs, outputs, vocab } = createTrainingData(rawData);
 
     const model = tf.sequential();
 
-    model.add(tf.layers.embedding({ 
-        inputDim: vocab.total_tokens, 
-        outputDim: 64, 
-        inputLength: 50 
+    model.add(tf.layers.embedding({
+        inputDim: vocab.total_tokens,
+        outputDim: 64,
+        inputLength: 50
     }));
-    model.add(tf.layers.lstm({ 
-        units: 256, 
-        returnSequences: true, 
-        inputShape: [50, vocab.total_tokens] 
+    model.add(tf.layers.lstm({
+        units: 256,
+        returnSequences: true,
+        inputShape: [50, vocab.total_tokens]
     }));
     model.add(tf.layers.lstm({ units: 128, returnSequences: true }));
     model.add(tf.layers.dense({ units: 1000, activation: 'softmax' }));
@@ -127,6 +128,6 @@ async function trainAndSaveModel(folderPath, outputModelPath) {
     console.log('Model saved to', outputModelPath);
 }
 
-const folderPath = './arduino_code';
-const outputModelPath = './ai_model'; 
+const folderPath = './arduino_code'; // Ganti dengan folder yang sesuai
+const outputModelPath = './ai_model'; // Ganti dengan path tujuan model
 trainAndSaveModel(folderPath, outputModelPath);
