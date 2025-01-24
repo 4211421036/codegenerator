@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Code Generator</title>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@2.10.0"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@2.10.0"></script> <!-- TensorFlow.js -->
 </head>
 <body>
     <h1>Arduino Code Generator</h1>
@@ -24,13 +24,22 @@
 
         // Fungsi untuk memuat model yang telah dilatih
         async function loadModel() {
-            // Ganti dengan path ke model Anda (URL atau lokal)
-            model = await tf.loadLayersModel('ai_model/model.json');
-            console.log('Model Loaded');
+            try {
+                // Ganti dengan path ke model Anda (URL atau lokal)
+                model = await tf.loadLayersModel('model/model.json');
+                console.log('Model Loaded');
+            } catch (error) {
+                console.error("Model failed to load", error);
+            }
         }
 
         // Fungsi untuk menghasilkan kode berdasarkan input
         async function generateCode(inputText) {
+            if (!model) {
+                console.error('Model belum dimuat!');
+                return;
+            }
+
             // Tokenize dan pre-process input (seperti yang telah Anda lakukan di script sebelumnya)
             const tokenizedInput = tokenizeInput(inputText);
             const inputTensor = tf.tensor2d([tokenizedInput], [1, 50]);
