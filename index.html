@@ -3,29 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Code Generator</title>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script> <!-- Memuat TensorFlow.js -->
+    <title>Arduino Code Generator</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            padding: 20px;
-        }
-        input, button {
-            padding: 10px;
-            margin: 10px;
-        }
-        #output {
-            margin-top: 20px;
-            padding: 10px;
-            background-color: #f0f0f0;
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        input, button { padding: 10px; margin: 10px; }
+        #output { 
+            margin-top: 20px; 
+            padding: 10px; 
+            background-color: #f0f0f0; 
             border-radius: 5px;
+            white-space: pre-wrap;
+            font-family: monospace;
         }
     </style>
 </head>
 <body>
-    <h1>Code Generator AI</h1>
+    <h1>Arduino Code Generator AI</h1>
     
-    <label for="userInput">Masukkan Input (Deskripsi):</label>
+    <label for="userInput">Masukkan Deskripsi Fungsionalitas:</label>
     <textarea id="userInput" rows="4" cols="50"></textarea>
     
     <br>
@@ -35,77 +31,98 @@
     <div id="output"></div>
 
     <script>
-        let model;
+        let model, vocab;
 
-        // Fungsi untuk memuat model dari URL
-        async function loadModel() {
+        // Memuat model dan vocabulary
+        async function loadModelAndVocab() {
             try {
-                console.log("Mencoba memuat model...");
                 model = await tf.loadLayersModel('https://4211421036.github.io/codegenerator/ai_model/model.json');
-                console.log("Model berhasil dimuat.");
+                
+                // Memuat vocabulary
+                const vocabResponse = await fetch('https://4211421036.github.io/codegenerator/ai_model/vocab.json');
+                vocab = await vocabResponse.json();
+                
+                console.log("Model dan Vocabulary berhasil dimuat.");
             } catch (error) {
-                console.error("Gagal memuat model:", error);
+                console.error("Gagal memuat model atau vocabulary:", error);
             }
         }
 
-        // Fungsi untuk memproses input pengguna
+        // Fungsi tokenisasi yang lebih komprehensif
+        function tokenize(text) {
+            // Konversi ke lowercase dan hapus karakter khusus
+            const cleanText = text.toLowerCase().replace(/[^\w\s]/g, '');
+            
+            // Pecah menjadi token
+            const tokens = cleanText.split(/\s+/);
+            
+            // Ambil token pertama 50
+            return tokens.slice(0, 50);
+        }
+
+        // Konversi token ke indeks numerik
+        function tokensToIndices(tokens) {
+            return tokens.map(token => {
+                const index = vocab.vocabulary.indexOf(token);
+                return index !== -1 ? index : 0; // Gunakan 0 jika token tidak ditemukan
+            });
+        }
+
+        // Padding input
+        function padInput(indices, length) {
+            const paddedInput = [...indices];
+            while (paddedInput.length < length) {
+                paddedInput.push(0);
+            }
+            return paddedInput.slice(0, length);
+        }
+
+        // Dekode output model kembali menjadi kode
+        function decodeOutput(outputTensor) {
+            // Konversi tensor ke array indeks
+            const outputIndices = Array.from(outputTensor.argMax(-1).dataSync());
+            
+            // Konversi indeks kembali ke token
+            const tokens = outputIndices.map(index => 
+                vocab.vocabulary[index] || ''
+            );
+
+            // Gabungkan token menjadi kode Arduino
+            return tokens.join(' ');
+        }
+
+        // Generate kode berdasarkan input
         async function generateCode() {
             const userInput = document.getElementById("userInput").value;
-
             if (!userInput.trim()) {
                 alert("Masukkan deskripsi terlebih dahulu.");
                 return;
             }
 
-            // Tokenisasi dan preprocess input
-            const inputTensor = preprocessInput(userInput);
+            try {
+                // Tokenisasi dan preproses input
+                const tokens = tokenize(userInput);
+                const indices = tokensToIndices(tokens);
+                const paddedInput = padInput(indices, 50);
 
-            // Membuat prediksi dari model
-            const prediction = model.predict(inputTensor);
-
-            // Ambil output dari model dan tampilkan hasilnya
-            const output = await prediction.data();
-            const generatedCode = decodeOutput(output);
-            
-            // Menampilkan hasil prediksi
-            document.getElementById("output").textContent = generatedCode;
-        }
-
-        // Preprocess input untuk dimasukkan ke model
-        function preprocessInput(inputText) {
-            const tokenizedInput = tokenize(inputText);
-            
-            // Pastikan panjang token selalu 50 (pad dengan 0 jika perlu)
-            const paddedInput = padInput(tokenizedInput, 50);
-            return tf.tensor2d([paddedInput]);
-        }
-
-        // Fungsi tokenisasi untuk input (contoh sederhana, bisa dikembangkan)
-        function tokenize(text) {
-            return text.split(/\s+/).map((_, i) => i).slice(0, 50);  // Tokenisasi sederhana dengan batas 50 token
-        }
-
-        // Fungsi untuk menambah padding agar panjang input selalu 50
-        function padInput(input, length) {
-            const paddedInput = [...input];
-            while (paddedInput.length < length) {
-                paddedInput.push(0);  // Padding dengan 0
+                // Prediksi menggunakan model
+                const inputTensor = tf.tensor2d([paddedInput]);
+                const prediction = model.predict(inputTensor);
+                
+                // Dekode dan tampilkan output
+                const generatedCode = decodeOutput(prediction);
+                document.getElementById("output").textContent = generatedCode;
+            } catch (error) {
+                console.error("Gagal generate kode:", error);
+                document.getElementById("output").textContent = "Gagal generate kode. Cek konsol untuk detail.";
             }
-            return paddedInput.slice(0, length);  // Memastikan panjangnya tepat 50
         }
 
-        // Fungsi untuk mendekode output dari model
-        function decodeOutput(output) {
-            // Mengonversi output menjadi string kode Arduino yang relevan
-            // Di sini kita hanya mengembalikan output sebagai string
-            return output.join(' ');
-        }
-
-        // Event listener untuk tombol Generate Code
+        // Event listener
         document.getElementById("generateCodeButton").addEventListener("click", generateCode);
-
-        // Memuat model ketika halaman dimuat
-        window.onload = loadModel;
+        
+        // Muat model saat halaman dimuat
+        window.onload = loadModelAndVocab;
     </script>
 </body>
 </html>
