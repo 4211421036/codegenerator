@@ -39,6 +39,12 @@ function createTrainingData(data) {
         outputs.push(paddedOutput);
     });
 
+    // Manually flatten the inputs array and create a vocabulary from it
+    const flattenedInputs = inputs.reduce((acc, curr) => acc.concat(curr), []);
+    const vocab = { vocabulary: Array.from(new Set(flattenedInputs)) };  // Creating a unique vocabulary from the input
+    fs.writeFileSync('vocab.json', JSON.stringify(vocab));  // Save vocabulary to file
+    console.log("Vocabulary created and saved as vocab.json");
+
     // One-hot encode the output tokens
     const numClasses = 1000;  // Define the number of classes (size of vocabulary)
     const oneHotEncodedOutputs = outputs.map(output =>
@@ -58,11 +64,6 @@ function createTrainingData(data) {
 async function trainAndSaveModel(folderPath, outputModelPath) {
     const rawData = preprocessData(folderPath);
     const { inputs, outputs } = createTrainingData(rawData);
-
-    // Create vocabulary file
-    const vocab = { vocabulary: Array.from(new Set(inputs.flat())) };  // Creating a unique vocabulary from the input
-    fs.writeFileSync('vocab.json', JSON.stringify(vocab));  // Save vocabulary to file
-    console.log("Vocabulary created and saved as vocab.json");
 
     const model = tf.sequential();
     model.add(tf.layers.embedding({ inputDim: 1000, outputDim: 64, inputLength: 50 }));
