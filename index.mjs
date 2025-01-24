@@ -86,8 +86,8 @@ function createTrainingData(data) {
 }
 
 function exactMatchLoss(yTrue, yPred) {
-    // Loss untuk matching yang lebih baik, menggunakan binary cross entropy
-    return tf.losses.binaryCrossentropy(yTrue, yPred);
+    // Use a loss function available in TensorFlow.js
+    return tf.losses.meanSquaredError(yTrue, yPred);
 }
 
 async function trainAndSaveModel(folderPath, outputModelPath) {
