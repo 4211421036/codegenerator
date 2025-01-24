@@ -16,15 +16,15 @@ function preprocessData(folderPath) {
 }
 
 function tokenize(text) {
-    const cleanedText = text.replace(/\/\/.*$/gm, '')               // Hapus komentar satu baris
-                            .replace(/\/\*[\s\S]*?\*\//g, '')      // Hapus komentar blok
-                            .replace(/\s+/g, ' ')                  // Gabungkan spasi
-                            .replace(/([{}();,=+\-*/<>_&|^%!~?])/g, ' $1 ')  // Beri spasi di sekitar simbol
-                            .replace(/\s+/g, ' ')                  // Bersihkan spasi ekstra
-                            .trim();                               // Hapus spasi di awal dan akhir
+    const cleanedText = text.replace(/\/\/.*$/gm, '')               // Remove line comments
+                            .replace(/\/\*[\s\S]*?\*\//g, '')      // Remove block comments
+                            .replace(/\s+/g, ' ')                  // Normalize spaces
+                            .replace(/([{}();,=+\-*/<>_&|^%!~?])/g, ' $1 ')  // Add space around symbols
+                            .replace(/\s+/g, ' ')                  // Remove extra spaces
+                            .trim();                               // Trim whitespace
 
-    const tokens = cleanedText.split(' '); // Pisahkan berdasarkan spasi
-    return tokens.filter(token => token.length > 0); // Hapus token kosong
+    const tokens = cleanedText.split(' '); // Split by space
+    return tokens.filter(token => token.length > 0); // Remove empty tokens
 }
 
 function createTrainingData(data) {
@@ -85,6 +85,7 @@ function createTrainingData(data) {
     };
 }
 
+
 function exactMatchLoss(yTrue, yPred) {
     // Use a loss function available in TensorFlow.js
     return tf.losses.meanSquaredError(yTrue, yPred);
@@ -101,33 +102,30 @@ async function trainAndSaveModel(folderPath, outputModelPath) {
         outputDim: 64,
         inputLength: 50
     }));
+    
     model.add(tf.layers.lstm({
         units: 256,
         returnSequences: true,
         inputShape: [50, vocab.total_tokens]
     }));
+    
     model.add(tf.layers.lstm({ units: 128, returnSequences: true }));
     model.add(tf.layers.dense({ units: 1000, activation: 'softmax' }));
     model.add(tf.layers.lstm({ units: 128, returnSequences: true }));
     model.add(tf.layers.dense({ units: vocab.total_tokens, activation: 'softmax' }));
-
-    // Compile model with the custom exactMatchLoss function
+    
     model.compile({
         loss: exactMatchLoss,
         optimizer: tf.train.adam(0.001)
-    });
+});
 
-    console.log('Training model...');
-    await model.fit(inputs, outputs, {
-        epochs: 20,
-        batchSize: 32,
-    });
+console.log('Training model...');
+await model.fit(inputs, outputs, {
+    epochs: 20,
+    batchSize: 32,
+});
 
-    console.log('Saving model...');
-    await model.save(`file://${outputModelPath}`);
-    console.log('Model saved to', outputModelPath);
-}
+console.log('Saving model...');
+await model.save(`file://${outputModelPath}`);
+console.log('Model saved to', outputModelPath);
 
-const folderPath = './arduino_code'; // Ganti dengan folder yang sesuai
-const outputModelPath = './ai_model'; // Ganti dengan path tujuan model
-trainAndSaveModel(folderPath, outputModelPath);
