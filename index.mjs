@@ -85,7 +85,6 @@ function createTrainingData(data) {
     };
 }
 
-
 function exactMatchLoss(yTrue, yPred) {
     // Use a loss function available in TensorFlow.js
     return tf.losses.meanSquaredError(yTrue, yPred);
@@ -117,15 +116,19 @@ async function trainAndSaveModel(folderPath, outputModelPath) {
     model.compile({
         loss: exactMatchLoss,
         optimizer: tf.train.adam(0.001)
-});
+    });
 
-console.log('Training model...');
-await model.fit(inputs, outputs, {
-    epochs: 20,
-    batchSize: 32,
-});
+    console.log('Training model...');
+    await model.fit(inputs, outputs, {
+        epochs: 20,
+        batchSize: 32,
+    });
 
-console.log('Saving model...');
-await model.save(`file://${outputModelPath}`);
-console.log('Model saved to', outputModelPath);
+    console.log('Saving model...');
+    await model.save(`file://${outputModelPath}`);
+    console.log('Model saved to', outputModelPath);
+}
 
+const folderPath = './arduino_code'; // Change this to the correct folder path
+const outputModelPath = './ai_model'; // Change this to the output model path
+trainAndSaveModel(folderPath, outputModelPath);
