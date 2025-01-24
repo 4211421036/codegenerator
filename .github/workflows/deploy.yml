@@ -33,6 +33,7 @@ jobs:
         # Optionally, you can add a command to inspect the output model directory
         ls -l ai_model  # Adjust if the model is stored in a different directory
         cat ai_model/model.json  # Display part of the model file (for example)
+        cat ai_model/vocab.json  # Display part of the model file (for example)
 
     - name: Commit and push trained model
       run: |
