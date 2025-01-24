@@ -1,66 +1,48 @@
 name: Train and Deploy AI Model
-
 on:
   schedule:
     - cron: '0 0 * * *'  # Running at midnight every day, adjust as needed
   push:
     branches:
       - main
-
 jobs:
   train-ai-model:
     runs-on: ubuntu-latest
-
     steps:
     - name: Checkout repository
       uses: actions/checkout@v3
-
     - name: Setup Node.js
       uses: actions/setup-node@v3
       with:
         node-version: '16'
-
     - name: Install dependencies
       run: |
         npm install
         npm install @tensorflow/tfjs-node  # Install TensorFlow for Node.js
-
-    - name: Create Model and Vocabulary
+    - name: Run AI Model Training Script
+      run: node trainModel.js  # Replace with your script for AI model training
+    - name: Debug AI Model Output
       run: |
-        # Ensure ai_model directory exists
-        mkdir -p ai_model
-        node index.mjs  # Replace with your script for AI model training
-
-    - name: Verify Model and Vocabulary Creation
-      run: |
-        # List files in ai_model to debug and see if vocab.json or model.json exist
-        ls -l ai_model
-        # Check for the model and vocab files
-        if [ -f "ai_model/model.json" ] && [ -f "ai_model/vocab.json" ]; then
-          echo "Model and vocabulary files created successfully."
-        else
-          echo "Error: Required files not found!" >&2
-          exit 1
-        fi
-
-    - name: Commit and Push Trained Model
+        # Optionally, you can add a command to inspect the output model directory
+        ls -l ai_model  # Adjust if the model is stored in a different directory
+        cat ai_model/model.json  # Display part of the model file (for example)
+    - name: Commit and push trained model
       run: |
         git config --global user.name "GitHub Actions"
         git config --global user.email "actions@github.com"
         
-        # Stage all modified files (including the trained model and vocab)
+        # Stage all modified files (including the trained model)
         git add ai_model/
         
         # Check if there are any changes before committing
         if git diff --cached --quiet; then
           echo "No changes to commit"
         else
-          git commit -m "Update trained AI model and vocabulary"
+          git commit -m "Add trained AI model"
           git push
         fi
-
-    - name: Upload Model and Vocabulary as Artifact (Optional)
+    - name: Upload model as artifact (optional)
       uses: actions/upload-artifact@v3
       with:
         name: ai-model
-        path: ./ai_model  # Path to the folder containing your trained model and vocab
+        path: ./ai_model  # Path to the folder containing your trained model
