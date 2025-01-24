@@ -45,10 +45,10 @@
 
             try {
                 // Load model from GitHub Pages or your hosting
-                model = await tf.loadLayersModel('https://your-domain.github.io/codegenerator/ai_model/model.json');
+                model = await tf.loadLayersModel('https://4211421036.github.io/codegenerator/ai_model/model.json');
                 
                 // Fetch vocabulary
-                const response = await fetch('https://your-domain.github.io/codegenerator/ai_model/vocab.json');
+                const response = await fetch('https://4211421036.github.io/codegenerator/ai_model/vocab.json');
                 vocab = await response.json();
 
                 status.textContent = 'Model loaded successfully!';
