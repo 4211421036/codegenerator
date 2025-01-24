@@ -19,21 +19,18 @@ function preprocessData(folderPath) {
 }
 
 function advancedTokenize(text, maxLength = 100) {
-    // Split into meaningful tokens, preserving code structure
-    const tokens = text
+    return text
         .split(/\n/)
         .map(line => line.trim())
         .filter(line => line.length > 0 && !line.startsWith('//'))
         .slice(0, maxLength);
-    
-    return tokens;
 }
 
 function createTrainingData(data) {
     const maxLength = 100;
-    const allTokens = new Set(['<PAD>']); // Add padding token
+    const allTokens = new Set(['<PAD>']);
 
-    // Collect all unique tokens first
+    // Collect all unique tokens
     data.forEach(({ input, output }) => {
         const inputTokens = advancedTokenize(input);
         const outputTokens = advancedTokenize(output);
@@ -64,12 +61,16 @@ function createTrainingData(data) {
             ...Array(maxLength - outputTokens.length).fill('<PAD>')
         ].slice(0, maxLength);
 
-        // Convert tokens to indices
-        const inputIndices = paddedInput.map(token => tokenToIndex.get(token) || 0);
-        const outputIndices = paddedOutput.map(token => tokenToIndex.get(token) || 0);
+        // Create one-hot encoded output
+        const oneHotOutput = paddedOutput.map(token => {
+            const oneHot = new Array(allTokens.size).fill(0);
+            const index = tokenToIndex.get(token);
+            oneHot[index] = 1;
+            return oneHot;
+        });
 
-        inputs.push(inputIndices);
-        outputs.push(outputIndices);
+        inputs.push(paddedInput.map(token => tokenToIndex.get(token) || 0));
+        outputs.push(oneHotOutput);
     });
 
     const vocab = {
@@ -79,7 +80,7 @@ function createTrainingData(data) {
 
     return {
         inputs: tf.tensor2d(inputs, [inputs.length, maxLength]),
-        outputs: tf.tensor2d(outputs, [outputs.length, maxLength]),
+        outputs: tf.tensor3d(outputs, [outputs.length, maxLength, allTokens.size]),
         vocab: vocab
     };
 }
