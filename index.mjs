@@ -17,17 +17,22 @@ function preprocessData(folderPath) {
 }
 
 function tokenize(text) {
-    // Bersihkan karakter yang tidak perlu dan tokenize berdasarkan kata kunci
-    const cleanedText = text.replace(/[^a-zA-Z0-9{};(),=+\-*/<>_]/g, ' ').toLowerCase();
-    const tokens = cleanedText.split(/\s+/);
-    return tokens.slice(0, 50); // Ambil 50 token pertama
+    // Tokenize kode C++/Arduino dengan memisahkan berdasarkan spasi, operator, dan tanda baca
+    const cleanedText = text.replace(/\/\/.*$/gm, '') // Hapus komentar satu baris
+                            .replace(/\/\*[\s\S]*?\*\//g, '') // Hapus komentar multi-barisan
+                            .replace(/\s+/g, ' ') // Ganti spasi ganda dengan satu spasi
+                            .replace(/([{}();,=+\-*/<>_&|^%!~?])/g, ' $1 ') // Pisahkan operator dan tanda baca
+                            .replace(/\s+/g, ' ') // Bersihkan spasi ganda
+                            .trim(); 
+
+    const tokens = cleanedText.split(' '); // Pisahkan berdasarkan spasi
+    return tokens.filter(token => token.length > 0); // Hanya ambil token yang bukan spasi kosong
 }
 
 function createTrainingData(data) {
     const inputs = [];
     const outputs = [];
     const maxLength = 50;
-    const numClasses = 1000;
 
     // Buat vocabulary dari semua token
     const allTokens = new Set();
@@ -70,7 +75,7 @@ function createTrainingData(data) {
 
     const oneHotEncodedOutputs = outputs.map(output =>
         output.map(token => {
-            const oneHot = Array(numClasses).fill(0);
+            const oneHot = Array(vocab.total_tokens).fill(0);
             const index = tokenToIndex.get(token) || 0;
             oneHot[index] = 1;
             return oneHot;
@@ -82,7 +87,7 @@ function createTrainingData(data) {
             inputs.map(input => input.map(token => tokenToIndex.get(token) || 0)),
             [inputs.length, maxLength]
         ),
-        outputs: tf.tensor3d(oneHotEncodedOutputs, [outputs.length, maxLength, numClasses]),
+        outputs: tf.tensor3d(oneHotEncodedOutputs, [outputs.length, maxLength, vocab.total_tokens]),
         vocab: vocab // Return the vocab as well
     };
 }
@@ -94,7 +99,7 @@ async function trainAndSaveModel(folderPath, outputModelPath) {
     const model = tf.sequential();
     model.add(tf.layers.embedding({ inputDim: vocab.total_tokens, outputDim: 64, inputLength: 50 }));
     model.add(tf.layers.lstm({ units: 128, returnSequences: true }));
-    model.add(tf.layers.dense({ units: 1000, activation: 'softmax' }));
+    model.add(tf.layers.dense({ units: vocab.total_tokens, activation: 'softmax' }));
 
     model.compile({ loss: 'categoricalCrossentropy', optimizer: 'adam' });
 
