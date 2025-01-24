@@ -16,7 +16,6 @@ function preprocessData(folderPath) {
     return data;
 }
 
-// Tokenize function with padding to ensure all token sequences are of equal length (50 tokens)
 function tokenize(text) {
     return text.split(/\s+/).map((_, i) => i).slice(0, 50);  // Ensure up to 50 tokens
 }
