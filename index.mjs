@@ -45,10 +45,14 @@ function createTrainingData(data) {
         inputTokens.forEach(token => allTokens.add(token));
         outputTokens.forEach(token => allTokens.add(token));
 
-        // Padding tokens
+        // Padding tokens untuk input
         const paddedInput = [...inputTokens, ...Array(maxLength - inputTokens.length).fill('<PAD>')].slice(0, maxLength);
-        const paddedOutput = [...outputTokens, ...Array(maxLength - outputTokens.length).fill('<PAD>')].slice(0, maxLength);
-        
+
+        // Padding tokens untuk output, pastikan panjang tidak lebih dari maxLength
+        const paddedOutput = outputTokens.length < maxLength
+            ? [...outputTokens, ...Array(maxLength - outputTokens.length).fill('<PAD>')].slice(0, maxLength)
+            : outputTokens.slice(0, maxLength);  // Jika panjangnya sudah lebih dari maxLength, ambil yang pertama saja
+
         inputs.push(paddedInput);
         outputs.push(paddedOutput);
     });
