@@ -105,8 +105,16 @@
                 const indices = tokensToIndices(tokens);
                 const paddedInput = padInput(indices, 50);
         
+                // Mengubah dimensi input jika diperlukan
+                const embeddingDim = 578; // Dimensi yang sesuai dengan model Anda
+                const inputWithEmbedding = paddedInput.map(index => {
+                    const embeddingVector = new Array(embeddingDim).fill(0); // Membuat vektor embedding kosong dengan panjang 578
+                    embeddingVector[index % embeddingDim] = 1; // Asumsikan ini cara sederhana untuk embedding
+                    return embeddingVector;
+                });
+        
                 // Prediksi menggunakan model
-                const inputTensor = tf.tensor2d([paddedInput]);
+                const inputTensor = tf.tensor2d([inputWithEmbedding]); // Tensor dengan dimensi yang sesuai
                 const prediction = model.predict(inputTensor);
         
                 // Dekode dan tampilkan output
