@@ -5,9 +5,11 @@ import path from 'path';
 function preprocessData(folderPath) {
     const files = fs.readdirSync(folderPath);
     const data = [];
+
     files.forEach(file => {
         if (file.endsWith('.ino')) {
             const content = fs.readFileSync(path.join(folderPath, file), 'utf8');
+            // Ambil hanya bagian kode yang relevan
             data.push({ input: file.replace('.ino', ''), output: content });
         }
     });
@@ -15,45 +17,43 @@ function preprocessData(folderPath) {
 }
 
 function tokenize(text) {
-    // Tokenisasi sebenarnya dengan membagi teks menjadi token
-    return text.split(/\s+/).slice(0, 50);
+    // Bersihkan karakter yang tidak perlu dan tokenize berdasarkan kata kunci
+    const cleanedText = text.replace(/[^a-zA-Z0-9{};(),=+\-*/<>_]/g, ' ').toLowerCase();
+    const tokens = cleanedText.split(/\s+/);
+    return tokens.slice(0, 50); // Ambil 50 token pertama
 }
 
 function createTrainingData(data) {
     const inputs = [];
     const outputs = [];
-    const maxLength = 50;
-    const numClasses = 1000;
+    const maxLength = 50; // Maksimal panjang token per input
 
-    // Buat vocabulary dari semua token
     const allTokens = new Set();
 
     data.forEach(({ input, output }) => {
         const inputTokens = tokenize(input);
         const outputTokens = tokenize(output);
 
-        // Tambahkan token ke vocabulary
+        // Menambahkan token ke vocab
         inputTokens.forEach(token => allTokens.add(token));
         outputTokens.forEach(token => allTokens.add(token));
 
-        // Padding tokens
+        // Padding tokens untuk input dan output
         const paddedInput = [...inputTokens, ...Array(maxLength - inputTokens.length).fill('<PAD>')].slice(0, maxLength);
         const paddedOutput = [...outputTokens, ...Array(maxLength - outputTokens.length).fill('<PAD>')].slice(0, maxLength);
-        
+
         inputs.push(paddedInput);
         outputs.push(paddedOutput);
     });
 
-    // Buat vocabulary dari token unik
-    const vocab = { 
+    const vocab = {
         vocabulary: Array.from(allTokens),
         total_tokens: allTokens.size
     };
-    
-    // Simpan vocab
+
+    // Menyimpan vocab
     const modelDir = path.resolve('./ai_model');
     const vocabPath = path.join(modelDir, 'vocab.json');
-    
     try {
         fs.writeFileSync(vocabPath, JSON.stringify(vocab, null, 2));
         console.log("Vocabulary created and saved. Total unique tokens:", allTokens.size);
@@ -61,12 +61,11 @@ function createTrainingData(data) {
         console.error('Error saving vocab.json:', err);
     }
 
-    // Proses one-hot encoding dengan mapping token ke indeks
+    // Melakukan one-hot encoding untuk output
     const tokenToIndex = new Map(Array.from(allTokens).map((token, index) => [token, index]));
-    
     const oneHotEncodedOutputs = outputs.map(output =>
         output.map(token => {
-            const oneHot = Array(numClasses).fill(0);
+            const oneHot = Array(vocab.total_tokens).fill(0);
             const index = tokenToIndex.get(token) || 0;
             oneHot[index] = 1;
             return oneHot;
@@ -74,11 +73,8 @@ function createTrainingData(data) {
     );
 
     return {
-        inputs: tf.tensor2d(
-            inputs.map(input => input.map(token => tokenToIndex.get(token) || 0)), 
-            [inputs.length, maxLength]
-        ),
-        outputs: tf.tensor3d(oneHotEncodedOutputs, [outputs.length, maxLength, numClasses]),
+        inputs: tf.tensor2d(inputs.map(input => input.map(token => tokenToIndex.get(token) || 0)), [inputs.length, maxLength]),
+        outputs: tf.tensor3d(oneHotEncodedOutputs, [outputs.length, maxLength, vocab.total_tokens]),
     };
 }
 
