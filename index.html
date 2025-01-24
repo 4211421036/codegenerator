@@ -6,8 +6,8 @@
     <title>Arduino Code Generator</title>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
     <style>
-        body { font-family: Arial, sans-serif; padding: 20px; }
-        input, button { padding: 10px; margin: 10px; }
+        body { font-family: Arial, sans-serif; padding: 20px; background-color: #f9f9f9; color: #333; }
+        input, button { padding: 10px; margin: 10px; font-size: 16px; border-radius: 5px; border: 1px solid #ddd; }
         #output { 
             margin-top: 20px; 
             padding: 10px; 
@@ -15,6 +15,35 @@
             border-radius: 5px;
             white-space: pre-wrap;
             font-family: monospace;
+            min-height: 100px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        #loadingStatus {
+            font-style: italic;
+            color: #888;
+            margin-top: 10px;
+        }
+        #generateCodeButton {
+            background-color: #4CAF50;
+            color: white;
+            cursor: pointer;
+        }
+        #generateCodeButton:hover {
+            background-color: #45a049;
+        }
+        .typing-animation {
+            border-right: 2px solid #333;
+            display: inline-block;
+            padding-right: 5px;
+            animation: typing 2s steps(30) 1s forwards, blinkCaret 0.75s step-end infinite;
+        }
+        @keyframes typing {
+            from { width: 0; }
+            to { width: 100%; }
+        }
+        @keyframes blinkCaret {
+            50% { border-color: transparent; }
         }
     </style>
 </head>
@@ -27,7 +56,7 @@
     <br>
     
     <button id="generateCodeButton">Generate Code</button>
-    
+    <div id="loadingStatus"></div>
     <div id="output"></div>
 
     <script>
@@ -50,13 +79,8 @@
 
         // Fungsi tokenisasi yang lebih komprehensif
         function tokenize(text) {
-            // Konversi ke lowercase dan hapus karakter khusus
             const cleanText = text.toLowerCase().replace(/[^\w\s]/g, '');
-            
-            // Pecah menjadi token
             const tokens = cleanText.split(/\s+/);
-            
-            // Ambil token pertama 50
             return tokens.slice(0, 50);
         }
 
@@ -64,7 +88,7 @@
         function tokensToIndices(tokens) {
             return tokens.map(token => {
                 const index = vocab.vocabulary.indexOf(token);
-                return index !== -1 ? index : 0; // Gunakan 0 jika token tidak ditemukan
+                return index !== -1 ? index : 0;
             });
         }
 
@@ -79,16 +103,29 @@
 
         // Dekode output model kembali menjadi kode
         function decodeOutput(outputTensor) {
-            // Konversi tensor ke array indeks
             const outputIndices = Array.from(outputTensor.argMax(-1).dataSync());
-            
-            // Konversi indeks kembali ke token
-            const tokens = outputIndices.map(index => 
-                vocab.vocabulary[index] || ''
-            );
-
-            // Gabungkan token menjadi kode Arduino
+            const tokens = outputIndices.map(index => vocab.vocabulary[index] || '');
             return tokens.join(' ');
+        }
+
+        // Fungsi untuk menampilkan animasi typing
+        function showTypingAnimation(text) {
+            const outputElement = document.getElementById("output");
+            outputElement.innerHTML = ''; // Kosongkan output sebelumnya
+            let i = 0;
+            const interval = setInterval(() => {
+                outputElement.innerHTML += text.charAt(i);
+                i++;
+                if (i === text.length) {
+                    clearInterval(interval);
+                }
+            }, 100);
+        }
+
+        // Fungsi untuk menunjukkan status loading
+        function showLoadingStatus() {
+            const loadingElement = document.getElementById("loadingStatus");
+            loadingElement.textContent = "Memproses..."; // Tampilkan status loading
         }
 
         // Generate kode berdasarkan input
@@ -98,26 +135,35 @@
                 alert("Masukkan deskripsi terlebih dahulu.");
                 return;
             }
-        
+
             try {
+                // Menampilkan animasi typing saat menunggu
+                showLoadingStatus();
+
                 // Tokenisasi dan preproses input
                 const tokens = tokenize(userInput);
                 const indices = tokensToIndices(tokens);
-                const paddedInput = padInput(indices, 50); // Pastikan panjangnya 50
-        
-                // Buat array dua dimensi dengan bentuk [1, 50] sesuai yang diharapkan model
-                const inputTensor = tf.tensor2d([paddedInput]); // Tensor dengan bentuk [1, 50]
-        
+                const paddedInput = padInput(indices, 50);
+
+                const inputTensor = tf.tensor2d([paddedInput]);
+
+                // Simulasi delay untuk efek loading
+                await new Promise(resolve => setTimeout(resolve, 2000));
+
                 // Prediksi menggunakan model
                 const prediction = model.predict(inputTensor);
-        
-                // Dekode dan tampilkan output
+
+                // Dekode dan tampilkan output dengan animasi typing
                 const generatedCode = decodeOutput(prediction);
-                document.getElementById("output").textContent = generatedCode;
-        
+                showTypingAnimation(generatedCode);
+
+                // Hilangkan status loading setelah selesai
+                document.getElementById("loadingStatus").textContent = '';
+
             } catch (error) {
                 console.error("Gagal generate kode:", error);
                 document.getElementById("output").textContent = "Gagal generate kode. Cek konsol untuk detail.";
+                document.getElementById("loadingStatus").textContent = '';
             }
         }
 
