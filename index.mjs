@@ -9,42 +9,40 @@ function preprocessData(folderPath) {
     files.forEach(file => {
         if (file.endsWith('.ino')) {
             const content = fs.readFileSync(path.join(folderPath, file), 'utf8');
-            data.push({ input: file.replace('.ino', ''), output: content });
+            // Preserve code structure
+            data.push({ 
+                input: file.replace('.ino', ''), 
+                output: content.trim()
+            });
         }
     });
     return data;
 }
 
-function tokenize(text) {
-    const cleanedText = text.replace(/\/\/.*$/gm, '')               // Remove line comments
-                            .replace(/\/\*[\s\S]*?\*\//g, '')      // Remove block comments
-                            .replace(/\s+/g, ' ')                  // Normalize spaces
-                            .replace(/([{}();,=+\-*/<>_&|^%!~?])/g, ' $1 ')  // Add space around symbols
-                            .replace(/\s+/g, ' ')                  // Remove extra spaces
-                            .trim();                               // Trim whitespace
-
-    const tokens = cleanedText.split(' '); // Split by space
-    return tokens.filter(token => token.length > 0); // Remove empty tokens
+function advancedTokenize(text) {
+    // Preserve code structure and meaningful tokens
+    return text
+        .split(/\n/)
+        .map(line => line.trim())
+        .filter(line => line.length > 0 && !line.startsWith('//'));
 }
 
 function createTrainingData(data) {
+    const maxLength = 100;  // Increased to capture more context
     const inputs = [];
     const outputs = [];
-    const maxLength = 50;
-
     const allTokens = new Set();
 
     data.forEach(({ input, output }) => {
-        const inputTokens = tokenize(input);
-        const outputTokens = tokenize(output);
+        const inputTokens = advancedTokenize(input);
+        const outputTokens = advancedTokenize(output);
 
         inputTokens.forEach(token => allTokens.add(token));
         outputTokens.forEach(token => allTokens.add(token));
 
-        const paddedInput = [...inputTokens, ...Array(maxLength - inputTokens.length).fill('<PAD>')].slice(0, maxLength);
-        const paddedOutput = outputTokens.length < maxLength
-            ? [...outputTokens, ...Array(maxLength - outputTokens.length).fill('<PAD>')].slice(0, maxLength)
-            : outputTokens.slice(0, maxLength);
+        // Pad or truncate tokens while maintaining structure
+        const paddedInput = inputTokens.slice(0, maxLength);
+        const paddedOutput = outputTokens.slice(0, maxLength);
 
         inputs.push(paddedInput);
         outputs.push(paddedOutput);
@@ -55,24 +53,8 @@ function createTrainingData(data) {
         total_tokens: allTokens.size
     };
 
-    const vocabPath = path.join('./ai_model', 'vocab.json');
-
-    try {
-        fs.writeFileSync(vocabPath, JSON.stringify(vocab, null, 2));
-        console.log("Vocabulary created and saved.");
-    } catch (err) {
-        console.error('Error saving vocab.json:', err);
-    }
-
-    const tokenToIndex = new Map(Array.from(allTokens).map((token, index) => [token, index]));
-
-    const oneHotEncodedOutputs = outputs.map(output =>
-        output.map(token => {
-            const oneHot = Array(vocab.total_tokens).fill(0);
-            const index = tokenToIndex.get(token) || 0;
-            oneHot[index] = 1;
-            return oneHot;
-        })
+    const tokenToIndex = new Map(
+        Array.from(allTokens).map((token, index) => [token, index])
     );
 
     return {
@@ -80,14 +62,12 @@ function createTrainingData(data) {
             inputs.map(input => input.map(token => tokenToIndex.get(token) || 0)),
             [inputs.length, maxLength]
         ),
-        outputs: tf.tensor3d(oneHotEncodedOutputs, [outputs.length, maxLength, vocab.total_tokens]),
+        outputs: tf.tensor2d(
+            outputs.map(output => output.map(token => tokenToIndex.get(token) || 0)),
+            [outputs.length, maxLength]
+        ),
         vocab: vocab
     };
-}
-
-function exactMatchLoss(yTrue, yPred) {
-    // Use a loss function available in TensorFlow.js
-    return tf.losses.meanSquaredError(yTrue, yPred);
 }
 
 async function trainAndSaveModel(folderPath, outputModelPath) {
@@ -98,37 +78,50 @@ async function trainAndSaveModel(folderPath, outputModelPath) {
 
     model.add(tf.layers.embedding({
         inputDim: vocab.total_tokens,
-        outputDim: 64,
-        inputLength: 50
+        outputDim: 128,
+        inputLength: 100
     }));
     
     model.add(tf.layers.lstm({
-        units: 256,
-        returnSequences: true,
-        inputShape: [50, vocab.total_tokens]
+        units: 256, 
+        returnSequences: true
     }));
     
-    model.add(tf.layers.lstm({ units: 128, returnSequences: true }));
-    model.add(tf.layers.dense({ units: 1000, activation: 'softmax' }));
-    model.add(tf.layers.lstm({ units: 128, returnSequences: true }));
-    model.add(tf.layers.dense({ units: vocab.total_tokens, activation: 'softmax' }));
+    model.add(tf.layers.dropout({ rate: 0.3 }));
+    
+    model.add(tf.layers.lstm({ 
+        units: 256, 
+        returnSequences: true 
+    }));
+    
+    model.add(tf.layers.dense({ 
+        units: vocab.total_tokens, 
+        activation: 'softmax' 
+    }));
     
     model.compile({
-        loss: exactMatchLoss,
+        loss: 'categoricalCrossentropy',
         optimizer: tf.train.adam(0.001)
     });
 
     console.log('Training model...');
     await model.fit(inputs, outputs, {
-        epochs: 20,
+        epochs: 50,
         batchSize: 32,
+        validationSplit: 0.2
     });
 
     console.log('Saving model...');
     await model.save(`file://${outputModelPath}`);
-    console.log('Model saved to', outputModelPath);
+    console.log('Model saved.');
+
+    // Save vocabulary
+    fs.writeFileSync(
+        path.join(outputModelPath, 'vocab.json'), 
+        JSON.stringify(vocab, null, 2)
+    );
 }
 
-const folderPath = './arduino_code'; // Change this to the correct folder path
-const outputModelPath = './ai_model'; // Change this to the output model path
+const folderPath = './arduino_code';
+const outputModelPath = './ai_model';
 trainAndSaveModel(folderPath, outputModelPath);
