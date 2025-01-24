@@ -83,10 +83,10 @@ async function trainAndSaveModel(folderPath, outputModelPath) {
     const { inputs, outputs } = createTrainingData(rawData);
 
     const model = tf.sequential();
-    model.add(tf.layers.embedding({ inputDim: 1000, outputDim: 64, inputLength: 50 }));
+    model.add(tf.layers.embedding({ inputDim: vocab.total_tokens, outputDim: 64, inputLength: 50 }));
     model.add(tf.layers.lstm({ units: 128, returnSequences: true }));
-    model.add(tf.layers.dense({ units: 1000, activation: 'softmax' }));
-    
+    model.add(tf.layers.attention({ units: 128 }));
+    model.add(tf.layers.dense({ units: vocab.total_tokens, activation: 'softmax' }));
     model.compile({ loss: 'categoricalCrossentropy', optimizer: 'adam' });
     
     console.log('Training model...');
