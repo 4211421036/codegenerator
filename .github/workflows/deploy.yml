@@ -25,34 +25,38 @@ jobs:
         npm install
         npm install @tensorflow/tfjs-node  # Install TensorFlow for Node.js
 
-    - name: Run AI Model Training Script
-      run: node index.mjs  # Replace with your script for AI model training
-
-    - name: Debug AI Model Output
+    - name: Create Model and Vocabulary
       run: |
-        # Optionally, you can add a command to inspect the output model directory
-        ls -l ai_model  # Adjust if the model is stored in a different directory
-        cat ai_model/model.json  # Display part of the model file (for example)
-        cat ai_model/vocab.json  # Display part of the model file (for example)
+        node index.mjs  # Replace with your script for AI model training
 
-    - name: Commit and push trained model
+    - name: Verify Model and Vocabulary Creation
+      run: |
+        if [ -f "ai_model/model.json" ] && [ -f "ai_model/vocab.json" ]; then
+          echo "Model and vocabulary files created successfully."
+        else
+          echo "Error: Required files not found!" >&2
+          exit 1
+        fi
+        ls -l ai_model
+
+    - name: Commit and Push Trained Model
       run: |
         git config --global user.name "GitHub Actions"
         git config --global user.email "actions@github.com"
         
-        # Stage all modified files (including the trained model)
+        # Stage all modified files (including the trained model and vocab)
         git add ai_model/
         
         # Check if there are any changes before committing
         if git diff --cached --quiet; then
           echo "No changes to commit"
         else
-          git commit -m "Add trained AI model"
+          git commit -m "Update trained AI model and vocabulary"
           git push
         fi
 
-    - name: Upload model as artifact (optional)
+    - name: Upload Model and Vocabulary as Artifact (Optional)
       uses: actions/upload-artifact@v3
       with:
         name: ai-model
-        path: ./ai_model  # Path to the folder containing your trained model
+        path: ./ai_model  # Path to the folder containing your trained model and vocab
