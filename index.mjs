@@ -121,7 +121,7 @@ async function trainAndSaveModel(folderPath, outputModelPath) {
 
     console.log('Training model...');
     await model.fit(inputs, outputs, {
-        epochs: 50,
+        epochs: 50000,
         batchSize: 32,
         validationSplit: 0.2
     });
