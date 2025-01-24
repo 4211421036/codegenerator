@@ -1,8 +1,8 @@
 import * as tf from '@tensorflow/tfjs-node';
 import fs from 'fs';
 
-// Function to preprocess data from .ino files and build vocabulary
-function preprocessDataAndBuildVocab(folderPath) {
+// Function to preprocess data from .ino files
+function preprocessData(folderPath) {
     const files = fs.readdirSync(folderPath);
     const data = [];
     const vocabSet = new Set();
@@ -10,57 +10,65 @@ function preprocessDataAndBuildVocab(folderPath) {
     files.forEach(file => {
         if (file.endsWith('.ino')) {
             const content = fs.readFileSync(`${folderPath}/${file}`, 'utf8');
-            const tokens = content.split(/\s+/); // Split by whitespace
-            tokens.forEach(token => vocabSet.add(token)); // Add tokens to vocabulary
-            data.push({ input: file.replace('.ino', ''), output: tokens });
+            const tokens = content.split(/\s+/);
+            tokens.forEach(token => vocabSet.add(token)); // Add tokens to the vocabulary set
+            data.push({ input: file.replace('.ino', ''), output: content });
         }
     });
 
-    const vocabulary = Array.from(vocabSet); // Convert Set to Array
-    const vocabIndex = {};
-    vocabulary.forEach((word, index) => {
-        vocabIndex[word] = index; // Map each token to an index
-    });
+    // Create vocabulary
+    const vocab = Array.from(vocabSet);
+    fs.writeFileSync('./ai_model/vocab.json', JSON.stringify(vocab, null, 2), 'utf8'); // Save vocab.json
+    console.log('Vocabulary created and saved as vocab.json');
 
-    return { data, vocabulary, vocabIndex };
+    return { data, vocab };
 }
 
-// Function to tokenize text based on vocabulary
-function tokenize(text, vocabIndex, maxLength = 50) {
-    const tokens = text.map(word => vocabIndex[word] || 0); // Map tokens to indices
-    return [...tokens, ...Array(maxLength - tokens.length).fill(0)].slice(0, maxLength); // Pad or truncate
+// Function to tokenize using the vocabulary
+function tokenize(text, vocab) {
+    const vocabMap = vocab.reduce((map, token, index) => {
+        map[token] = index + 1; // Assign 1-based indices
+        return map;
+    }, {});
+
+    return text.split(/\s+/).map(token => vocabMap[token] || 0); // Map tokens to indices
 }
 
-// Function to create training data
-function createTrainingData(data, vocabIndex, maxLength = 50) {
+function createTrainingData(data, vocab) {
     const inputs = [];
     const outputs = [];
 
-    data.forEach(({ input, output }) => {
-        const inputTokens = tokenize(input.split(/\s+/), vocabIndex, maxLength);
-        const outputTokens = tokenize(output, vocabIndex, maxLength);
+    const maxLength = 50; // Fixed sequence length
 
-        inputs.push(inputTokens);
-        outputs.push(outputTokens);
+    data.forEach(({ input, output }) => {
+        const inputTokens = tokenize(input, vocab);
+        const outputTokens = tokenize(output, vocab);
+
+        // Pad or truncate sequences
+        const paddedInput = [...inputTokens, ...Array(maxLength - inputTokens.length).fill(0)].slice(0, maxLength);
+        const paddedOutput = [...outputTokens, ...Array(maxLength - outputTokens.length).fill(0)].slice(0, maxLength);
+
+        inputs.push(paddedInput);
+        outputs.push(paddedOutput);
     });
 
-    return {
-        inputs: tf.tensor2d(inputs, [inputs.length, maxLength]),
-        outputs: tf.tensor2d(outputs, [outputs.length, maxLength]),
-    };
+    // Convert to tensors
+    const inputTensor = tf.tensor2d(inputs, [inputs.length, maxLength]);
+    const outputTensor = tf.oneHot(tf.tensor1d(outputs.flat(), 'int32'), vocab.length + 1).reshape([outputs.length, maxLength, vocab.length + 1]);
+
+    return { inputs: inputTensor, outputs: outputTensor };
 }
 
-// Function to train and save the model
 async function trainAndSaveModel(folderPath, outputModelPath) {
-    const { data, vocabulary, vocabIndex } = preprocessDataAndBuildVocab(folderPath);
-    const { inputs, outputs } = createTrainingData(data, vocabIndex);
+    const { data, vocab } = preprocessData(folderPath);
+    const { inputs, outputs } = createTrainingData(data, vocab);
 
     const model = tf.sequential();
-    model.add(tf.layers.embedding({ inputDim: vocabulary.length, outputDim: 64, inputLength: 50 }));
+    model.add(tf.layers.embedding({ inputDim: vocab.length + 1, outputDim: 64, inputLength: 50 }));
     model.add(tf.layers.lstm({ units: 128, returnSequences: true }));
-    model.add(tf.layers.dense({ units: vocabulary.length, activation: 'softmax' }));
+    model.add(tf.layers.dense({ units: vocab.length + 1, activation: 'softmax' }));
 
-    model.compile({ loss: 'sparseCategoricalCrossentropy', optimizer: 'adam' });
+    model.compile({ loss: 'categoricalCrossentropy', optimizer: 'adam' });
 
     console.log('Training model...');
     await model.fit(inputs, outputs, {
@@ -71,39 +79,9 @@ async function trainAndSaveModel(folderPath, outputModelPath) {
     console.log('Saving model...');
     await model.save(`file://${outputModelPath}`);
     console.log('Model saved to', outputModelPath);
-
-    // Save the vocabulary to a file
-    fs.writeFileSync(`${outputModelPath}/vocab.json`, JSON.stringify(vocabulary));
 }
 
-// Function to generate code using the trained model
-async function generateCode(modelPath, vocabPath, inputText, maxLength = 50) {
-    const model = await tf.loadLayersModel(`file://${modelPath}/model.json`);
-    const vocabulary = JSON.parse(fs.readFileSync(vocabPath, 'utf8'));
-    const vocabIndex = {};
-    vocabulary.forEach((word, index) => {
-        vocabIndex[word] = index;
-    });
-
-    const inputTokens = tokenize(inputText.split(/\s+/), vocabIndex, maxLength);
-    const inputTensor = tf.tensor2d([inputTokens], [1, maxLength]);
-
-    const output = model.predict(inputTensor).arraySync()[0];
-    const result = output.map(indices => vocabulary[indices]);
-
-    return result.join(' ');
-}
-
-// Paths
 const folderPath = './arduino_code'; // Folder containing .ino files
-const outputModelPath = './ai_model'; // Folder to save the model
-const vocabPath = `${outputModelPath}/vocab.json`;
-
-// Train the model
-trainAndSaveModel(folderPath, outputModelPath)
-    .then(() => {
-        console.log('Training complete.');
-    })
-    .catch(err => {
-        console.error('Error during training:', err);
-    });
+const outputModelPath = './ai_model'; // Directory to save model
+fs.mkdirSync(outputModelPath, { recursive: true }); // Ensure the output directory exists
+trainAndSaveModel(folderPath, outputModelPath);
