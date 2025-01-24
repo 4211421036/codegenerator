@@ -9,7 +9,6 @@ function preprocessData(folderPath) {
     files.forEach(file => {
         if (file.endsWith('.ino')) {
             const content = fs.readFileSync(path.join(folderPath, file), 'utf8');
-            // Ambil hanya bagian kode yang relevan
             data.push({ input: file.replace('.ino', ''), output: content });
         }
     });
@@ -17,16 +16,15 @@ function preprocessData(folderPath) {
 }
 
 function tokenize(text) {
-    // Tokenize kode C++/Arduino dengan memisahkan berdasarkan spasi, operator, dan tanda baca
-    const cleanedText = text.replace(/\/\/.*$/gm, '') // Hapus komentar satu baris
-                            .replace(/\/\*[\s\S]*?\*\//g, '') // Hapus komentar multi-barisan
-                            .replace(/\s+/g, ' ') // Ganti spasi ganda dengan satu spasi
-                            .replace(/([{}();,=+\-*/<>_&|^%!~?])/g, ' $1 ') // Pisahkan operator dan tanda baca
-                            .replace(/\s+/g, ' ') // Bersihkan spasi ganda
+    const cleanedText = text.replace(/\/\/.*$/gm, '')
+                            .replace(/\/\*[\s\S]*?\*\//g, '')
+                            .replace(/\s+/g, ' ') 
+                            .replace(/([{}();,=+\-*/<>_&|^%!~?])/g, ' $1 ') 
+                            .replace(/\s+/g, ' ') 
                             .trim(); 
 
-    const tokens = cleanedText.split(' '); // Pisahkan berdasarkan spasi
-    return tokens.filter(token => token.length > 0); // Hanya ambil token yang bukan spasi kosong
+    const tokens = cleanedText.split(' ');
+    return tokens.filter(token => token.length > 0); 
 }
 
 function createTrainingData(data) {
@@ -34,47 +32,38 @@ function createTrainingData(data) {
     const outputs = [];
     const maxLength = 50;
 
-    // Buat vocabulary dari semua token
     const allTokens = new Set();
 
     data.forEach(({ input, output }) => {
         const inputTokens = tokenize(input);
         const outputTokens = tokenize(output);
 
-        // Tambahkan token ke vocabulary
         inputTokens.forEach(token => allTokens.add(token));
         outputTokens.forEach(token => allTokens.add(token));
 
-        // Padding tokens untuk input
         const paddedInput = [...inputTokens, ...Array(maxLength - inputTokens.length).fill('<PAD>')].slice(0, maxLength);
-
-        // Padding tokens untuk output, pastikan panjang tidak lebih dari maxLength
         const paddedOutput = outputTokens.length < maxLength
             ? [...outputTokens, ...Array(maxLength - outputTokens.length).fill('<PAD>')].slice(0, maxLength)
-            : outputTokens.slice(0, maxLength);  // Jika panjangnya sudah lebih dari maxLength, ambil yang pertama saja
+            : outputTokens.slice(0, maxLength); 
 
         inputs.push(paddedInput);
         outputs.push(paddedOutput);
     });
 
-    // Buat vocabulary dari token unik
     const vocab = { 
         vocabulary: Array.from(allTokens),
         total_tokens: allTokens.size
     };
 
-    // Simpan vocab
-    const modelDir = path.resolve('./ai_model');
-    const vocabPath = path.join(modelDir, 'vocab.json');
+    const vocabPath = path.join('./ai_model', 'vocab.json');
 
     try {
         fs.writeFileSync(vocabPath, JSON.stringify(vocab, null, 2));
-        console.log("Vocabulary created and saved. Total unique tokens:", allTokens.size);
+        console.log("Vocabulary created and saved.");
     } catch (err) {
         console.error('Error saving vocab.json:', err);
     }
 
-    // Proses one-hot encoding dengan mapping token ke indeks
     const tokenToIndex = new Map(Array.from(allTokens).map((token, index) => [token, index]));
 
     const oneHotEncodedOutputs = outputs.map(output =>
@@ -92,17 +81,20 @@ function createTrainingData(data) {
             [inputs.length, maxLength]
         ),
         outputs: tf.tensor3d(oneHotEncodedOutputs, [outputs.length, maxLength, vocab.total_tokens]),
-        vocab: vocab // Return the vocab as well
+        vocab: vocab
     };
+}
+
+function exactMatchLoss(yTrue, yPred) {
+    return tf.losses.meanSquaredError(yTrue, yPred);
 }
 
 async function trainAndSaveModel(folderPath, outputModelPath) {
     const rawData = preprocessData(folderPath);
-    const { inputs, outputs, vocab } = createTrainingData(rawData); // Get vocab here
+    const { inputs, outputs, vocab } = createTrainingData(rawData); 
 
     const model = tf.sequential();
 
-    // Define the model layers with correct inputShape
     model.add(tf.layers.embedding({ 
         inputDim: vocab.total_tokens, 
         outputDim: 64, 
@@ -111,19 +103,23 @@ async function trainAndSaveModel(folderPath, outputModelPath) {
     model.add(tf.layers.lstm({ 
         units: 256, 
         returnSequences: true, 
-        inputShape: [50, vocab.total_tokens] // Defining input shape for the first LSTM layer
+        inputShape: [50, vocab.total_tokens] 
     }));
     model.add(tf.layers.lstm({ units: 128, returnSequences: true }));
     model.add(tf.layers.dense({ units: 1000, activation: 'softmax' }));
     model.add(tf.layers.lstm({ units: 128, returnSequences: true }));
     model.add(tf.layers.dense({ units: vocab.total_tokens, activation: 'softmax' }));
 
-    model.compile({ loss: 'categoricalCrossentropy', optimizer: tf.train.adam(0.001) });
+    // Compile model with the custom exactMatchLoss function
+    model.compile({
+        loss: exactMatchLoss,
+        optimizer: tf.train.adam(0.001)
+    });
 
     console.log('Training model...');
     await model.fit(inputs, outputs, {
         epochs: 20,
-        batchSize: 32,  // You can try different batch sizes for better results
+        batchSize: 32,
     });
 
     console.log('Saving model...');
@@ -131,6 +127,6 @@ async function trainAndSaveModel(folderPath, outputModelPath) {
     console.log('Model saved to', outputModelPath);
 }
 
-const folderPath = './arduino_code';  // Path to your .ino files
-const outputModelPath = './ai_model'; // Path where the trained model will be saved
+const folderPath = './arduino_code';
+const outputModelPath = './ai_model'; 
 trainAndSaveModel(folderPath, outputModelPath);
