@@ -98,20 +98,21 @@
                 alert("Masukkan deskripsi terlebih dahulu.");
                 return;
             }
-
+        
             try {
                 // Tokenisasi dan preproses input
                 const tokens = tokenize(userInput);
                 const indices = tokensToIndices(tokens);
                 const paddedInput = padInput(indices, 50);
-
+        
                 // Prediksi menggunakan model
                 const inputTensor = tf.tensor2d([paddedInput]);
                 const prediction = model.predict(inputTensor);
-                
+        
                 // Dekode dan tampilkan output
                 const generatedCode = decodeOutput(prediction);
                 document.getElementById("output").textContent = generatedCode;
+        
             } catch (error) {
                 console.error("Gagal generate kode:", error);
                 document.getElementById("output").textContent = "Gagal generate kode. Cek konsol untuk detail.";
