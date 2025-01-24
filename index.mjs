@@ -101,17 +101,21 @@ async function trainAndSaveModel(folderPath, outputModelPath) {
     const { inputs, outputs, vocab } = createTrainingData(rawData); // Get vocab here
 
     const model = tf.sequential();
+    model.add(tf.layers.lstm({ units: 256, returnSequences: true }));
+    model.add(tf.layers.lstm({ units: 128, returnSequences: true }));
+    model.add(tf.layers.dense({ units: 1000, activation: 'softmax' }));
     model.add(tf.layers.embedding({ inputDim: vocab.total_tokens, outputDim: 64, inputLength: 50 }));
     model.add(tf.layers.lstm({ units: 128, returnSequences: true }));
     model.add(tf.layers.dense({ units: vocab.total_tokens, activation: 'softmax' }));
 
-    model.compile({ loss: 'categoricalCrossentropy', optimizer: 'adam' });
+    model.compile({ loss: 'categoricalCrossentropy', optimizer: tf.train.sgd(0.01) });
 
     console.log('Training model...');
     await model.fit(inputs, outputs, {
-        epochs: 10,
-        batchSize: 16,
+        epochs: 20,
+        batchSize: 32,  // Coba ukuran batch yang berbeda
     });
+
 
     console.log('Saving model...');
     await model.save(`file://${outputModelPath}`);
