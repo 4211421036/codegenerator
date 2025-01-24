@@ -31,13 +31,15 @@ jobs:
 
     - name: Verify Model and Vocabulary Creation
       run: |
+        # List files in ai_model to debug and see if vocab.json or model.json exist
+        ls -l ai_model
+        # Check for the model and vocab files
         if [ -f "ai_model/model.json" ] && [ -f "ai_model/vocab.json" ]; then
           echo "Model and vocabulary files created successfully."
         else
           echo "Error: Required files not found!" >&2
           exit 1
         fi
-        ls -l ai_model
 
     - name: Commit and Push Trained Model
       run: |
