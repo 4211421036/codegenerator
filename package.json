@@ -1,0 +1,12 @@
+{
+  "name": "Code Generator",
+  "version": "1.0.0",
+  "main": "index.mjs",
+  "dependencies": {
+    "@tensorflow/tfjs-node": "^3.0.0",
+    "fs-extra": "^10.0.0"
+  },
+  "scripts": {
+    "start": "node index.mjs"
+  }
+}
