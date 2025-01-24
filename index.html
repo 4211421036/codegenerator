@@ -103,20 +103,12 @@
                 // Tokenisasi dan preproses input
                 const tokens = tokenize(userInput);
                 const indices = tokensToIndices(tokens);
-                const paddedInput = padInput(indices, 50);
+                const paddedInput = padInput(indices, 50); // Pastikan panjangnya 50
         
-                // Mengubah dimensi input jika diperlukan
-                const embeddingDim = 578; // Dimensi yang sesuai dengan model Anda
-        
-                // Membuat array dua dimensi yang valid untuk input tensor
-                const inputWithEmbedding = paddedInput.map(index => {
-                    const embeddingVector = new Array(embeddingDim).fill(0); // Membuat vektor embedding kosong dengan panjang 578
-                    embeddingVector[index % embeddingDim] = 1; // Atur nilai embedding berdasarkan index
-                    return embeddingVector; // Pastikan ini menjadi array 1D yang valid
-                });
+                // Buat array dua dimensi dengan bentuk [1, 50] sesuai yang diharapkan model
+                const inputTensor = tf.tensor2d([paddedInput]); // Tensor dengan bentuk [1, 50]
         
                 // Prediksi menggunakan model
-                const inputTensor = tf.tensor2d(inputWithEmbedding); // Tensor dengan dimensi yang sesuai
                 const prediction = model.predict(inputTensor);
         
                 // Dekode dan tampilkan output
