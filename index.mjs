@@ -26,34 +26,38 @@ function tokenize(text) {
 function createTrainingData(data) {
     const inputs = [];
     const outputs = [];
-    const maxLength = 50; // Maksimal panjang token per input
+    const maxLength = 50;
+    const numClasses = 1000;
 
+    // Buat vocabulary dari semua token
     const allTokens = new Set();
 
     data.forEach(({ input, output }) => {
         const inputTokens = tokenize(input);
         const outputTokens = tokenize(output);
 
-        // Menambahkan token ke vocab
+        // Tambahkan token ke vocabulary
         inputTokens.forEach(token => allTokens.add(token));
         outputTokens.forEach(token => allTokens.add(token));
 
-        // Padding tokens untuk input dan output
+        // Padding tokens
         const paddedInput = [...inputTokens, ...Array(maxLength - inputTokens.length).fill('<PAD>')].slice(0, maxLength);
         const paddedOutput = [...outputTokens, ...Array(maxLength - outputTokens.length).fill('<PAD>')].slice(0, maxLength);
-
+        
         inputs.push(paddedInput);
         outputs.push(paddedOutput);
     });
 
-    const vocab = {
+    // Buat vocabulary dari token unik
+    const vocab = { 
         vocabulary: Array.from(allTokens),
         total_tokens: allTokens.size
     };
 
-    // Menyimpan vocab
+    // Simpan vocab
     const modelDir = path.resolve('./ai_model');
     const vocabPath = path.join(modelDir, 'vocab.json');
+
     try {
         fs.writeFileSync(vocabPath, JSON.stringify(vocab, null, 2));
         console.log("Vocabulary created and saved. Total unique tokens:", allTokens.size);
@@ -61,11 +65,12 @@ function createTrainingData(data) {
         console.error('Error saving vocab.json:', err);
     }
 
-    // Melakukan one-hot encoding untuk output
+    // Proses one-hot encoding dengan mapping token ke indeks
     const tokenToIndex = new Map(Array.from(allTokens).map((token, index) => [token, index]));
+
     const oneHotEncodedOutputs = outputs.map(output =>
         output.map(token => {
-            const oneHot = Array(vocab.total_tokens).fill(0);
+            const oneHot = Array(numClasses).fill(0);
             const index = tokenToIndex.get(token) || 0;
             oneHot[index] = 1;
             return oneHot;
@@ -73,28 +78,32 @@ function createTrainingData(data) {
     );
 
     return {
-        inputs: tf.tensor2d(inputs.map(input => input.map(token => tokenToIndex.get(token) || 0)), [inputs.length, maxLength]),
-        outputs: tf.tensor3d(oneHotEncodedOutputs, [outputs.length, maxLength, vocab.total_tokens]),
+        inputs: tf.tensor2d(
+            inputs.map(input => input.map(token => tokenToIndex.get(token) || 0)),
+            [inputs.length, maxLength]
+        ),
+        outputs: tf.tensor3d(oneHotEncodedOutputs, [outputs.length, maxLength, numClasses]),
+        vocab: vocab // Return the vocab as well
     };
 }
 
 async function trainAndSaveModel(folderPath, outputModelPath) {
     const rawData = preprocessData(folderPath);
-    const { inputs, outputs } = createTrainingData(rawData);
+    const { inputs, outputs, vocab } = createTrainingData(rawData); // Get vocab here
 
     const model = tf.sequential();
     model.add(tf.layers.embedding({ inputDim: vocab.total_tokens, outputDim: 64, inputLength: 50 }));
     model.add(tf.layers.lstm({ units: 128, returnSequences: true }));
-    model.add(tf.layers.attention({ units: 128 }));
-    model.add(tf.layers.dense({ units: vocab.total_tokens, activation: 'softmax' }));
+    model.add(tf.layers.dense({ units: 1000, activation: 'softmax' }));
+
     model.compile({ loss: 'categoricalCrossentropy', optimizer: 'adam' });
-    
+
     console.log('Training model...');
     await model.fit(inputs, outputs, {
         epochs: 10,
         batchSize: 16,
     });
-    
+
     console.log('Saving model...');
     await model.save(`file://${outputModelPath}`);
     console.log('Model saved to', outputModelPath);
