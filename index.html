@@ -81,9 +81,11 @@
     </div>
 
     <script>
+        // Variabel untuk model dan vocab
         let model;
         let vocab;
 
+        // Fungsi untuk memuat model TensorFlow dan vocabulary
         async function loadModelAndVocab() {
             try {
                 model = await tf.loadLayersModel('./ai_model/model.json');
@@ -95,66 +97,61 @@
             }
         }
 
+        // Fungsi untuk tokenisasi input
         function tokenizeInput(input, maxLength) {
             const tokens = input.toLowerCase().replace(/[^\w\s]/g, '').split(/\s+/);
             const tokenToIndex = vocab.tokenToIndex;
 
-            const tokenized = [
+            const paddedTokens = [
                 tokenToIndex['<START>'],
-                ...tokens.map(token => tokenToIndex[token] || tokenToIndex['<PAD>']),
+                ...tokens.slice(0, maxLength - 2).map(token => tokenToIndex[token] || tokenToIndex['<PAD>']),
                 tokenToIndex['<END>']
             ];
 
-            // Pastikan panjangnya sesuai dengan maxLength
-            return tf.tensor2d([[
-                ...tokenized.slice(0, maxLength),
-                ...Array(Math.max(0, maxLength - tokenized.length)).fill(tokenToIndex['<PAD>'])
-            ]]);
+            console.log(`Jumlah token: ${paddedTokens.length}, maxLength: ${maxLength}`);
+
+            return tf.tensor2d([
+                [...paddedTokens, ...Array(maxLength - paddedTokens.length).fill(tokenToIndex['<PAD>'])]
+            ], [1, maxLength]);
         }
 
+        // Fungsi untuk menghasilkan kode
         async function generateCode() {
             const inputField = document.getElementById('userInput');
             const outputField = document.getElementById('outputCode');
-            const inputText = inputField.value.trim();
+            const inputText = inputField.value;
 
-            if (!inputText) {
-                alert("Deskripsi proyek tidak boleh kosong!");
+            if (!inputText || !model || !vocab) {
+                alert("Pastikan deskripsi proyek telah diisi dan model berhasil dimuat.");
                 return;
             }
 
-            if (!model || !vocab) {
-                alert("Model atau vocabulary belum dimuat. Mohon tunggu beberapa saat.");
-                return;
-            }
+            const maxLength = 100; // Panjang maksimum sesuai model
+            const inputTensor = tokenizeInput(inputText, maxLength);
 
             try {
-                const maxLength = 150;
-                const inputTensor = tokenizeInput(inputText, maxLength);
                 const prediction = model.predict(inputTensor);
                 const outputIndices = prediction.argMax(-1).dataSync();
-
-                const generatedTokens = Array.from(outputIndices)
+                const generatedTokens = outputIndices
                     .map(index => vocab.vocabulary[index])
-                    .filter(token => token && !['<PAD>', '<START>', '<END>'].includes(token));
-
-                const setupCode = generatedTokens.slice(0, 10).join(' ');
-                const loopCode = generatedTokens.slice(10).join(' ');
+                    .filter(token => token && token !== '<PAD>' && token !== '<START>' && token !== '<END>');
 
                 const generatedCode = `
-                    void setup() {
-                        ${setupCode || '// Tambahkan kode setup di sini'}
-                    }
-                    
-                    void loop() {
-                        ${loopCode || '// Tambahkan kode loop di sini'}
-                    }`;
+void setup() {
+    ${generatedTokens.slice(0, 10).join(' ')}
+}
+
+void loop() {
+    ${generatedTokens.slice(10, 20).join(' ')}
+}`;
                 outputField.textContent = generatedCode;
             } catch (error) {
                 console.error("Error saat menghasilkan kode:", error);
-                alert("Terjadi kesalahan saat menghasilkan kode. Periksa konsol untuk detailnya.");
+                alert("Terjadi kesalahan saat menghasilkan kode. Silakan cek kembali input Anda.");
             }
         }
 
+        // Inisialisasi
         document.getElementById('generateButton').addEventListener('click', generateCode);
         loadModelAndVocab();
     </script>
