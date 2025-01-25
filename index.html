@@ -82,32 +82,55 @@
     <script>
         // Fungsi untuk mengambil kode dari GitHub
         async function fetchCodeFromGitHub(query) {
-            const apiUrl = `https://api.github.com/search/code?q=${query}+in:file+language:ino`;
-            const response = await fetch(apiUrl);
-            const data = await response.json();
+            const apiUrl = `https://api.github.com/search/code?q=${encodeURIComponent(query)}+in:file+language:ino`;
+            const headers = {
+                'Authorization': 'Bearer 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' // Ganti dengan token Anda
+            };
 
-            if (data.items && data.items.length > 0) {
-                // Ambil file kode pertama yang ditemukan
-                const fileUrl = data.items[0].html_url;
-                return fileUrl;
-            } else {
-                return "Tidak ada kode ditemukan di GitHub.";
+            try {
+                const response = await fetch(apiUrl, { headers });
+                if (!response.ok) {
+                    throw new Error('Gagal mengambil data dari GitHub. Status: ' + response.status);
+                }
+                const data = await response.json();
+                if (data.items && data.items.length > 0) {
+                    // Ambil file kode pertama yang ditemukan
+                    const fileUrl = data.items[0].html_url;
+                    return fileUrl;
+                } else {
+                    return "Tidak ada kode ditemukan di GitHub.";
+                }
+            } catch (error) {
+                console.error("Error:", error);
+                return "Terjadi kesalahan saat mengambil kode dari GitHub.";
             }
         }
 
-        // Fungsi untuk mengambil model dan vocab JSON, Anda dapat mengonfigurasi ini sesuai kebutuhan
+        // Fungsi untuk mengambil model dan vocab JSON
         async function loadModelAndVocab() {
-            // Contoh model dan vocab yang dapat Anda sesuaikan
-            const model = await fetch('model.json').then(res => res.json());
-            const vocab = await fetch('vocab.json').then(res => res.json());
-            return { model, vocab };
+            try {
+                const modelResponse = await fetch('https://4211421036.github.io/ai_model/model.json'); // Ganti dengan URL yang benar
+                if (!modelResponse.ok) {
+                    throw new Error('Gagal mengambil model.');
+                }
+                const model = await modelResponse.json();
+
+                const vocabResponse = await fetch('https://4211421036.github.io/ai_model/vocab.json'); // Ganti dengan URL yang benar
+                if (!vocabResponse.ok) {
+                    throw new Error('Gagal mengambil vocab.');
+                }
+                const vocab = await vocabResponse.json();
+
+                return { model, vocab };
+            } catch (error) {
+                console.error("Error mengambil model atau vocab:", error);
+                return { model: null, vocab: null };
+            }
         }
 
         // Fungsi untuk memproses dan menambahkan komentar ke kode yang diambil
         function addCommentsToCode(code) {
-            // Komentar bisa ditambahkan berdasarkan analisis dari model dan vocab
             let commentedCode = code;
-            // Misalnya menambahkan komentar umum
             commentedCode = `// Kode ini diambil dari GitHub berdasarkan pencarian.\n\n` + commentedCode;
             commentedCode = `// Proyek ini: ${document.getElementById('userInput').value}\n\n` + commentedCode;
             return commentedCode;
@@ -124,12 +147,21 @@
                 return;
             }
 
+            outputField.textContent = "Mengambil kode, harap tunggu..."; // Indikasi proses sedang berlangsung
+
             try {
                 // Mengambil kode dari GitHub berdasarkan input pengguna
                 let generatedCode = await fetchCodeFromGitHub(inputText);
 
                 // Mengambil model dan vocab untuk menyesuaikan kode (jika diperlukan)
                 let { model, vocab } = await loadModelAndVocab();
+
+                if (model && vocab) {
+                    // Proses model dan vocab jika dibutuhkan
+                    console.log("Model dan vocab berhasil dimuat:", model, vocab);
+                } else {
+                    console.log("Model dan vocab tidak ditemukan.");
+                }
 
                 // Menambahkan komentar ke kode yang diambil
                 generatedCode = addCommentsToCode(generatedCode);
@@ -138,7 +170,7 @@
                 outputField.textContent = generatedCode;
             } catch (error) {
                 console.error("Error saat menghasilkan kode:", error);
-                outputField.textContent = "Terjadi kesalahan saat mengambil kode.";
+                outputField.textContent = "Terjadi kesalahan saat menghasilkan kode.";
             }
         }
 
