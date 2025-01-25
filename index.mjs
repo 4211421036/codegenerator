@@ -2,104 +2,162 @@ import * as tf from '@tensorflow/tfjs-node';
 import fs from 'fs';
 import path from 'path';
 
-// Fungsi untuk memproses data dari folder .ino
-function preprocessData(folderPath) {
-    const files = fs.readdirSync(folderPath);
-    return files
-        .filter(file => file.endsWith('.ino'))
-        .map(file => ({
-            input: file.replace('.ino', ''),
-            output: fs.readFileSync(path.join(folderPath, file), 'utf8').trim(),
-        }));
-}
+class ArduinoCodeTrainer {
+    constructor(folderPath) {
+        this.folderPath = folderPath;
+        this.maxLength = 150;
+    }
 
-// Tokenisasi teks dengan panjang maksimal
-function advancedTokenize(text, maxLength = 100) {
-    return text
-        .toLowerCase()
-        .replace(/[^\w\s]/g, '')
-        .split(/\s+/)
-        .filter(Boolean)
-        .slice(0, maxLength);
-}
+    preprocessData() {
+        const files = fs.readdirSync(this.folderPath);
+        const data = [];
 
-// Membuat data pelatihan
-function createTrainingData(data) {
-    const maxLength = 150;
-    const tokensSet = new Set(['<PAD>', '<START>', '<END>']);
-    data.forEach(({ input, output }) => {
-        advancedTokenize(input).forEach(token => tokensSet.add(token));
-        advancedTokenize(output).forEach(token => tokensSet.add(token));
-    });
+        files.forEach(file => {
+            if (file.endsWith('.ino')) {
+                const content = fs.readFileSync(path.join(this.folderPath, file), 'utf8');
+                data.push({
+                    input: file.replace('.ino', ''),
+                    output: content.trim()
+                });
+            }
+        });
+        return data;
+    }
 
-    const tokenToIndex = Object.fromEntries(
-        Array.from(tokensSet).map((token, index) => [token, index])
-    );
+    tokenize(text, maxLength = this.maxLength) {
+        return text
+            .toLowerCase()
+            .replace(/[^\w\s]/g, '')
+            .split(/\s+/)
+            .filter(token => token.length > 0)
+            .slice(0, maxLength);
+    }
 
-    const inputs = [];
-    const outputs = [];
+    createTrainingData(data) {
+        const allTokens = new Set(['<PAD>', '<START>', '<END>']);
 
-    data.forEach(({ input, output }) => {
-        const inputTokens = ['<START>', ...advancedTokenize(input, maxLength - 2), '<END>'];
-        const outputTokens = ['<START>', ...advancedTokenize(output, maxLength - 2), '<END>'];
+        // Collect all unique tokens
+        data.forEach(({ input, output }) => {
+            const inputTokens = this.tokenize(input);
+            const outputTokens = this.tokenize(output);
 
-        const pad = (tokens) =>
-            [...tokens, ...Array(maxLength - tokens.length).fill('<PAD>')].slice(0, maxLength);
+            inputTokens.forEach(token => allTokens.add(token));
+            outputTokens.forEach(token => allTokens.add(token));
+        });
 
-        inputs.push(pad(inputTokens).map(token => tokenToIndex[token] || 0));
-        outputs.push(
-            pad(outputTokens).map(token => {
-                const oneHot = Array(tokensSet.size).fill(0);
-                oneHot[tokenToIndex[token] || 0] = 1;
-                return oneHot;
-            })
+        const tokenToIndex = new Map(
+            Array.from(allTokens).map((token, index) => [token, index])
         );
-    });
 
-    return {
-        inputs: tf.tensor2d(inputs, [inputs.length, maxLength]),
-        outputs: tf.tensor3d(outputs, [outputs.length, maxLength, tokensSet.size]),
-        vocab: { vocabulary: Array.from(tokensSet), tokenToIndex },
-    };
+        const inputs = [];
+        const outputs = [];
+
+        data.forEach(({ input, output }) => {
+            const inputTokens = ['<START>', ...this.tokenize(input), '<END>'];
+            const outputTokens = ['<START>', ...this.tokenize(output), '<END>'];
+
+            const paddedInput = [
+                ...inputTokens,
+                ...Array(this.maxLength - inputTokens.length).fill('<PAD>')
+            ].slice(0, this.maxLength);
+
+            const paddedOutput = [
+                ...outputTokens,
+                ...Array(this.maxLength - outputTokens.length).fill('<PAD>')
+            ].slice(0, this.maxLength);
+
+            const oneHotOutput = paddedOutput.map(token => {
+                const oneHot = new Array(allTokens.size).fill(0);
+                const index = tokenToIndex.get(token);
+                oneHot[index] = 1;
+                return oneHot;
+            });
+
+            inputs.push(paddedInput.map(token => tokenToIndex.get(token) || 0));
+            outputs.push(oneHotOutput);
+        });
+
+        const vocab = {
+            vocabulary: Array.from(allTokens),
+            total_tokens: allTokens.size,
+            tokenToIndex: Object.fromEntries(tokenToIndex)
+        };
+
+        return {
+            inputs: tf.tensor2d(inputs, [inputs.length, this.maxLength]),
+            outputs: tf.tensor3d(outputs, [outputs.length, this.maxLength, allTokens.size]),
+            vocab: vocab
+        };
+    }
+
+    createModel(vocabSize) {
+        const model = tf.sequential();
+
+        model.add(tf.layers.embedding({
+            inputDim: vocabSize,
+            outputDim: 256,
+            inputLength: this.maxLength
+        }));
+
+        model.add(tf.layers.lstm({
+            units: 512,
+            returnSequences: true,
+            recurrentDropout: 0.2
+        }));
+
+        model.add(tf.layers.dropout({ rate: 0.3 }));
+
+        model.add(tf.layers.lstm({
+            units: 512,
+            returnSequences: true,
+            recurrentDropout: 0.2
+        }));
+
+        model.add(tf.layers.dense({
+            units: vocabSize,
+            activation: 'softmax'
+        }));
+
+        model.compile({
+            loss: 'categoricalCrossentropy',
+            optimizer: tf.train.adam(0.001),
+            metrics: ['accuracy']
+        });
+
+        return model;
+    }
+
+    async train() {
+        const rawData = this.preprocessData();
+        const { inputs, outputs, vocab } = this.createTrainingData(rawData);
+
+        const model = this.createModel(vocab.total_tokens);
+
+        console.log('Training model...');
+        const history = await model.fit(inputs, outputs, {
+            epochs: 500,
+            batchSize: 64,
+            validationSplit: 0.2,
+            callbacks: {
+                onEpochEnd: async (epoch, logs) => {
+                    console.log(`Epoch ${epoch}: loss = ${logs.loss}, accuracy = ${logs.accuracy}`);
+                }
+            }
+        });
+
+        // Save model, vocab, and weights
+        const modelPath = './ai_model';
+        await model.save(`file://${modelPath}`);
+        
+        fs.writeFileSync(
+            path.join(modelPath, 'vocab.json'),
+            JSON.stringify(vocab, null, 2)
+        );
+
+        console.log('Model training complete.');
+    }
 }
 
-// Pelatihan model
-async function trainModel(dataPath, outputPath) {
-    const data = preprocessData(dataPath);
-    const { inputs, outputs, vocab } = createTrainingData(data);
-
-    const model = tf.sequential();
-    model.add(tf.layers.embedding({ inputDim: vocab.vocabulary.length, outputDim: 256, inputLength: 150 }));
-    model.add(tf.layers.lstm({ units: 512, returnSequences: true, recurrentDropout: 0.2 }));
-    model.add(tf.layers.dropout({ rate: 0.3 }));
-    model.add(tf.layers.lstm({ units: 512, returnSequences: true, recurrentDropout: 0.2 }));
-    model.add(tf.layers.dense({ units: vocab.vocabulary.length, activation: 'softmax' }));
-
-    model.compile({
-        loss: 'categoricalCrossentropy',
-        optimizer: tf.train.adam(0.001),
-        metrics: ['accuracy'],
-    });
-
-    console.log('Training...');
-    await model.fit(inputs, outputs, {
-        epochs: 120,
-        batchSize: 32,
-        validationSplit: 0.2,
-    });
-
-    await model.save(`file://${outputPath}`);
-    fs.writeFileSync(path.join(outputPath, 'vocab.json'), JSON.stringify(vocab, null, 2));
-    console.log('Model trained and saved!');
-}
-
-// Main function
-async function main() {
-    const folderPath = './arduino_code'; // Folder .ino
-    const outputModelPath = './ai_model'; // Output model
-
-    await trainModel(folderPath, outputModelPath);
-    console.log('Model and vocabulary are ready for use!');
-}
-
-main().catch(console.error);
+// Run training
+const trainer = new ArduinoCodeTrainer('./arduino_code');
+trainer.train().catch(console.error);
