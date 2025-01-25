@@ -9,8 +9,8 @@ function preprocessData(folderPath) {
     files.forEach(file => {
         if (file.endsWith('.ino')) {
             const content = fs.readFileSync(path.join(folderPath, file), 'utf8');
-            data.push({ 
-                input: file.replace('.ino', ''), 
+            data.push({
+                input: file.replace('.ino', ''),
                 output: content.trim()
             });
         }
@@ -19,7 +19,6 @@ function preprocessData(folderPath) {
 }
 
 function advancedTokenize(text, maxLength = 100) {
-    // More sophisticated tokenization
     return text
         .toLowerCase()
         .replace(/[^\w\s]/g, '')
@@ -29,10 +28,9 @@ function advancedTokenize(text, maxLength = 100) {
 }
 
 function createTrainingData(data) {
-    const maxLength = 150;  // Increased max length
+    const maxLength = 150;
     const allTokens = new Set(['<PAD>', '<START>', '<END>']);
 
-    // Collect all unique tokens
     data.forEach(({ input, output }) => {
         const inputTokens = advancedTokenize(input);
         const outputTokens = advancedTokenize(output);
@@ -49,21 +47,19 @@ function createTrainingData(data) {
     const outputs = [];
 
     data.forEach(({ input, output }) => {
-        // Enhanced tokenization and padding
-        const inputTokens = ['<START>', ...advancedTokenize(input, maxLength-2), '<END>'];
-        const outputTokens = ['<START>', ...advancedTokenize(output, maxLength-2), '<END>'];
+        const inputTokens = ['<START>', ...advancedTokenize(input, maxLength - 2), '<END>'];
+        const outputTokens = ['<START>', ...advancedTokenize(output, maxLength - 2), '<END>'];
 
         const paddedInput = [
-            ...inputTokens, 
+            ...inputTokens,
             ...Array(maxLength - inputTokens.length).fill('<PAD>')
         ].slice(0, maxLength);
 
         const paddedOutput = [
-            ...outputTokens, 
+            ...outputTokens,
             ...Array(maxLength - outputTokens.length).fill('<PAD>')
         ].slice(0, maxLength);
 
-        // One-hot encoding with improved handling
         const oneHotOutput = paddedOutput.map(token => {
             const oneHot = new Array(allTokens.size).fill(0);
             const index = tokenToIndex.get(token);
@@ -94,32 +90,31 @@ async function trainAndSaveModel(folderPath, outputModelPath) {
 
     const model = tf.sequential();
 
-    // Enhanced model architecture
     model.add(tf.layers.embedding({
         inputDim: vocab.total_tokens,
         outputDim: 256,
         inputLength: 150
     }));
-    
+
     model.add(tf.layers.lstm({
-        units: 512, 
+        units: 512,
         returnSequences: true,
         recurrentDropout: 0.2
     }));
-    
+
     model.add(tf.layers.dropout({ rate: 0.3 }));
-    
-    model.add(tf.layers.lstm({ 
-        units: 512, 
+
+    model.add(tf.layers.lstm({
+        units: 512,
         returnSequences: true,
         recurrentDropout: 0.2
     }));
-    
-    model.add(tf.layers.dense({ 
-        units: vocab.total_tokens, 
-        activation: 'softmax' 
+
+    model.add(tf.layers.dense({
+        units: vocab.total_tokens,
+        activation: 'softmax'
     }));
-    
+
     model.compile({
         loss: 'categoricalCrossentropy',
         optimizer: tf.train.adam(0.001),
@@ -140,24 +135,18 @@ async function trainAndSaveModel(folderPath, outputModelPath) {
 
     console.log('Saving model...');
     await model.save(`file://${outputModelPath}`);
-    console.log('Model saved.');
-
-    // Save vocabulary with more details
     fs.writeFileSync(
-        path.join(outputModelPath, 'vocab.json'), 
+        path.join(outputModelPath, 'vocab.json'),
         JSON.stringify(vocab, null, 2)
     );
 
     return { model, vocab };
 }
 
-// Code generation function
-function generateArduinoCode(model, vocab, inputDescription) {
-    // Tokenize input
+export async function generateArduinoCode(model, vocab, inputDescription) {
     const inputTokens = advancedTokenize(inputDescription);
     const maxLength = 150;
 
-    // Prepare input tensor
     const tokenToIndex = vocab.tokenToIndex;
     const paddedInput = [
         tokenToIndex['<START>'],
@@ -168,26 +157,20 @@ function generateArduinoCode(model, vocab, inputDescription) {
 
     const inputTensor = tf.tensor2d([paddedInput], [1, maxLength]);
 
-    // Generate prediction
     const prediction = model.predict(inputTensor);
-    
-    // Decode output
     const outputIndices = prediction.argMax(-1).dataSync();
     const generatedTokens = outputIndices
         .map(index => vocab.vocabulary[index])
         .filter(token => token && token !== '<PAD>' && token !== '<START>' && token !== '<END>');
 
-    // Basic code template generation
-    return `// Generated Arduino Code for: ${inputDescription}
-void setup() {
-    // Initialization
-    ${generatedTokens.slice(0, 10).join(' ')}
-}
-
-void loop() {
-    // Main logic
-    ${generatedTokens.slice(10, 20).join(' ')}
-}`;
+    return `// Generated Arduino Code
+    void setup() {
+        ${generatedTokens.slice(0, 10).join(' ')}
+    }
+    
+    void loop() {
+        ${generatedTokens.slice(10, 20).join(' ')}
+    }`;
 }
 
 const folderPath = './arduino_code';
@@ -195,10 +178,9 @@ const outputModelPath = './ai_model';
 
 async function main() {
     const { model, vocab } = await trainAndSaveModel(folderPath, outputModelPath);
-    
-    // Example usage
+
     const projectDescription = "Temperature sensor with LCD display";
-    const generatedCode = generateArduinoCode(model, vocab, projectDescription);
+    const generatedCode = await generateArduinoCode(model, vocab, projectDescription);
     console.log(generatedCode);
 }
 
