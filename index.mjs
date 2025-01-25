@@ -34,10 +34,13 @@ class ArduinoCodeTrainer {
     }
 
     createTrainingData(data) {
+        // Limit the number of files to process to prevent array overflow
+        const limitedData = data.slice(0, 50);
+        
         const allTokens = new Set(['<PAD>', '<START>', '<END>']);
 
         // Collect all unique tokens
-        data.forEach(({ input, output }) => {
+        limitedData.forEach(({ input, output }) => {
             const inputTokens = this.tokenize(input);
             const outputTokens = this.tokenize(output);
 
@@ -52,7 +55,7 @@ class ArduinoCodeTrainer {
         const inputs = [];
         const outputs = [];
 
-        data.forEach(({ input, output }) => {
+        limitedData.forEach(({ input, output }) => {
             const inputTokens = ['<START>', ...this.tokenize(input), '<END>'];
             const outputTokens = ['<START>', ...this.tokenize(output), '<END>'];
 
@@ -135,8 +138,8 @@ class ArduinoCodeTrainer {
 
         console.log('Training model...');
         const history = await model.fit(inputs, outputs, {
-            epochs: 500,
-            batchSize: 64,
+            epochs: 50, // Reduced epochs to prevent potential memory issues
+            batchSize: 32, // Reduced batch size
             validationSplit: 0.2,
             callbacks: {
                 onEpochEnd: async (epoch, logs) => {
