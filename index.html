@@ -1,155 +1,110 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Arduino Code Generator</title>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 0;
-            background-color: #f4f4f9;
-            color: #333;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-        }
-
-        h1 {
-            color: #4caf50;
-        }
-
-        textarea {
-            width: 90%;
-            max-width: 600px;
-            height: 150px;
-            margin: 10px 0;
-            padding: 10px;
-            font-size: 16px;
-            border: 1px solid #ccc;
-            border-radius: 8px;
-            resize: none;
-        }
-
-        button {
-            padding: 10px 20px;
-            font-size: 16px;
-            color: #fff;
-            background-color: #4caf50;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: background-color 0.3s;
-        }
-
-        button:hover {
-            background-color: #45a049;
-        }
-
-        pre {
-            width: 90%;
-            max-width: 600px;
-            padding: 10px;
-            background-color: #222;
-            color: #f4f4f9;
-            font-size: 14px;
-            overflow-x: auto;
-            border-radius: 8px;
-            box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
-        }
-
-        .footer {
-            margin-top: 20px;
-            font-size: 12px;
-            color: #777;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Arduino Code Generator</title>
+  <script type="module" src="./index.mjs"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      background-color: #f4f4f9;
+    }
+    textarea {
+      width: 100%;
+      height: 100px;
+      font-size: 16px;
+      padding: 10px;
+      margin-bottom: 10px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    button {
+      padding: 10px 15px;
+      font-size: 16px;
+      border: none;
+      background-color: #28a745;
+      color: white;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #218838;
+    }
+    pre {
+      background: #eee;
+      padding: 10px;
+      border-radius: 4px;
+      overflow-x: auto;
+    }
+  </style>
 </head>
 <body>
-    <h1>Arduino Code Generator</h1>
-    <p>Masukkan deskripsi proyek Arduino Anda, lalu klik tombol "Generate" untuk mendapatkan kode otomatis.</p>
-    <textarea id="userInput" placeholder="Contoh: Mengukur suhu menggunakan sensor DHT11 dan menampilkan hasilnya di LCD"></textarea>
-    <button id="generateButton">Generate</button>
-    <pre id="outputCode">Kode akan muncul di sini...</pre>
-
-    <div class="footer">
-        <p>© 2025 Arduino Code Generator</p>
-    </div>
-
-    <script>
+  <h1>Arduino Code Generator</h1>
+  <p>Masukkan deskripsi proyek Anda di bawah:</p>
+  <textarea id="userInput" placeholder="Contoh: Gunakan sensor DHT11 untuk membaca suhu dan menampilkan di Serial Monitor"></textarea>
+  <button id="generateButton">Generate Code</button>
+  <h2>Hasil Kode Arduino:</h2>
+  <pre id="outputCode">Kode akan muncul di sini...</pre>
+  <script>
+        import * as tf from 'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.6.0/dist/tf.min.js';
         let model;
         let vocab;
-
-        async function loadModelAndVocab() {
-            try {
-                // Memuat model TensorFlow dan vocab
-                model = await tf.loadLayersModel('./ai_model/model.json');
-                const vocabResponse = await fetch('./ai_model/vocab.json');
-                vocab = await vocabResponse.json();
-                console.log("Model dan vocabulary berhasil dimuat!");
-            } catch (error) {
-                console.error("Gagal memuat model atau vocabulary:", error);
-            }
+        
+        // Memuat model dan vocab saat aplikasi dimulai
+        async function loadModel() {
+          model = await tf.loadLayersModel('./model/model.json');
+          const response = await fetch('./model/vocab.json');
+          vocab = await response.json();
+          console.log('Model dan kosakata berhasil dimuat.');
         }
-
-        // Tokenisasi input
-        function tokenizeInput(input, maxLength) {
-            const tokens = input.toLowerCase().replace(/[^\w\s]/g, '').split(/\s+/);
-            const tokenToIndex = vocab.tokenToIndex;
-
-            // Padded tokens untuk input
-            const paddedTokens = [
-                tokenToIndex['<START>'],
-                ...tokens.map(token => tokenToIndex[token] || tokenToIndex['<PAD>']),
-                tokenToIndex['<END>']
-            ];
-
-            return tf.tensor2d([[
-                ...paddedTokens, 
-                ...Array(maxLength - paddedTokens.length).fill(tokenToIndex['<PAD>'])
-            ]], [1, maxLength]);
+        
+        // Mengonversi teks input ke token
+        function tokenizeInput(inputText) {
+          const tokens = inputText.split(' ').map(word => vocab[word] || vocab['<UNK>']);
+          return tf.tensor([tokens], [1, tokens.length]);
         }
-
-        // Fungsi untuk generate kode Arduino
+        
+        // Menghasilkan kode dari token
+        function detokenizeOutput(tokens) {
+          const reverseVocab = Object.fromEntries(Object.entries(vocab).map(([k, v]) => [v, k]));
+          return tokens.map(token => reverseVocab[token] || '').join(' ');
+        }
+        
+        // Fungsi utama untuk menghasilkan kode Arduino
         async function generateCode() {
-            const inputField = document.getElementById('userInput');
-            const outputField = document.getElementById('outputCode');
-            const inputText = inputField.value;
-
-            if (!inputText || !model || !vocab) {
-                alert("Pastikan deskripsi proyek telah diisi dan model berhasil dimuat.");
-                return;
-            }
-
-            const maxLength = 150;
-            const inputTensor = tokenizeInput(inputText, maxLength);
-
-            // Melakukan prediksi dengan model
-            const prediction = model.predict(inputTensor);
-            const outputIndices = prediction.argMax(-1).dataSync();
-            const generatedTokens = outputIndices
-                .map(index => vocab.vocabulary[index])
-                .filter(token => token && token !== '<PAD>' && token !== '<START>' && token !== '<END>');
-
-            // Membuat kode Arduino
-            const generatedCode = `void setup() {
-    ${generatedTokens.slice(0, 10).join(' ')}
-}
-
-void loop() {
-    ${generatedTokens.slice(10, 20).join(' ')}
-}`;
-
-            outputField.textContent = generatedCode;
+          const input = document.getElementById('userInput').value.trim();
+          const outputField = document.getElementById('outputCode');
+        
+          if (!input) {
+            outputField.textContent = 'Harap masukkan deskripsi proyek terlebih dahulu.';
+            return;
+          }
+        
+          // Tokenisasi input
+          const inputTensor = tokenizeInput(input);
+        
+          // Prediksi output
+          const prediction = model.predict(inputTensor);
+          const outputTokens = prediction.argMax(-1).dataSync(); // Ambil token output
+        
+          // Detokenisasi hasil prediksi
+          const outputCode = detokenizeOutput(Array.from(outputTokens));
+        
+          // Tampilkan kode hasil
+          outputField.textContent = outputCode;
+        
+          // Membersihkan tensor untuk menghindari memory leak
+          tf.dispose([inputTensor, prediction]);
         }
-
-        // Inisialisasi dan Event Listener
+        
+        // Event listener untuk tombol Generate
         document.getElementById('generateButton').addEventListener('click', generateCode);
-        loadModelAndVocab();
-    </script>
+        
+        // Panggil fungsi loadModel saat aplikasi dimuat
+        loadModel();
+
+  </script>
 </body>
 </html>
