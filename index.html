@@ -116,52 +116,55 @@
         }
 
         // Fungsi untuk mencari kode secara online
-        async function fetchCodeOnline(query) {
-            const url = `https://www.arduino.cc/reference/en/?q=${encodeURIComponent(query)}`;
-            const response = await fetch(url);
-            const text = await response.text();
-            const codeMatch = text.match(/<code.*?>(.*?)<\/code>/s);
-            return codeMatch ? codeMatch[1] : "Kode tidak ditemukan. Silakan coba lagi.";
+        async function fetchCodeFromWeb(query) {
+            // Ini adalah contoh sederhana. Anda bisa menggunakan API atau pencarian kode lebih lanjut
+            const response = await fetch(`https://api.arduino.cc/v1/code/search?q=${query}`);
+            const data = await response.json();
+            return data.codeSnippet || "Tidak ada kode ditemukan.";
         }
 
         // Fungsi untuk menghasilkan kode
+
         async function generateCode() {
             const inputField = document.getElementById('userInput');
             const outputField = document.getElementById('outputCode');
             const inputText = inputField.value;
-
+        
             if (!inputText || !model || !vocab) {
                 alert("Pastikan deskripsi proyek telah diisi dan model berhasil dimuat.");
                 return;
             }
-
+        
             const maxLength = 100; // Panjang maksimum sesuai model
             const inputTensor = tokenizeInput(inputText, maxLength);
-
+        
             try {
                 const prediction = model.predict(inputTensor);
                 const outputIndices = prediction.argMax(-1).dataSync();
                 const generatedTokens = outputIndices
                     .map(index => vocab.vocabulary[index])
                     .filter(token => token && token !== '<PAD>' && token !== '<START>' && token !== '<END>');
-
-                const generatedCode = `
-void setup() {
-    ${generatedTokens.slice(0, 10).join(' ')}
-}
-
-void loop() {
-    ${generatedTokens.slice(10, 20).join(' ')}
-}`;
-                outputField.textContent = generatedCode;
+        
+                if (generatedTokens.length === 0) {
+                    // Jika model gagal menghasilkan kode, cari alternatif di internet
+                    const alternativeCode = await fetchCodeFromWeb(inputText);
+                    outputField.textContent = alternativeCode;
+                } else {
+                    const generatedCode = `
+        void setup() {
+            ${generatedTokens.slice(0, 10).join(' ')}
+        }
+        
+        void loop() {
+            ${generatedTokens.slice(10, 20).join(' ')}
+        }`;
+                    outputField.textContent = generatedCode;
+                }
             } catch (error) {
                 console.error("Error saat menghasilkan kode:", error);
-                // Jika model gagal, coba cari kode secara online
-                const onlineCode = await fetchCodeOnline(inputText);
-                outputField.textContent = onlineCode;
+                alert("Terjadi kesalahan saat menghasilkan kode. Silakan cek kembali input Anda.");
             }
         }
-
         // Inisialisasi
         document.getElementById('generateButton').addEventListener('click', generateCode);
         loadModelAndVocab();
