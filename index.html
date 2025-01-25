@@ -57,6 +57,11 @@
             border-radius: 8px;
             max-height: 400px;
             overflow-y: auto;
+            white-space: pre-wrap;
+        }
+        .thinking {
+            font-style: italic;
+            color: #777;
         }
     </style>
 </head>
@@ -66,6 +71,7 @@
         <textarea id="userInput" placeholder="Describe your Arduino project..."></textarea>
         <button id="generateButton">Generate Code</button>
         <pre id="outputCode">Arduino code will appear here...</pre>
+        <p id="thinkingText" class="thinking"></p>
     </div>
 
     <script>
@@ -154,6 +160,7 @@ void loop() {
         async function generateCode() {
             const inputText = document.getElementById('userInput').value;
             const outputField = document.getElementById('outputCode');
+            const thinkingText = document.getElementById('thinkingText');
 
             if (!inputText) {
                 alert("Please enter a project description.");
@@ -165,11 +172,34 @@ void loop() {
                     await codeGenerator.loadModelAndVocab();
                 }
 
-                const arduinoCode = codeGenerator.generateCodeFromInput(inputText);
-                outputField.textContent = arduinoCode;
+                // Simulate thinking animation
+                thinkingText.textContent = "Thinking... Please wait...";
+                outputField.textContent = ""; // Clear previous output
+
+                // Simulate typing animation
+                setTimeout(async () => {
+                    const arduinoCode = codeGenerator.generateCodeFromInput(inputText);
+                    outputField.textContent = "";
+                    let i = 0;
+                    const typingSpeed = 50; // milliseconds between typing each character
+
+                    function typeCharacter() {
+                        if (i < arduinoCode.length) {
+                            outputField.textContent += arduinoCode.charAt(i);
+                            i++;
+                            setTimeout(typeCharacter, typingSpeed);
+                        } else {
+                            thinkingText.textContent = ""; // Clear thinking text after completion
+                        }
+                    }
+
+                    typeCharacter(); // Start the typing animation
+                }, 1500); // Simulate the thinking delay before typing starts
+
             } catch (error) {
                 console.error("Error generating code:", error);
                 outputField.textContent = "An error occurred while generating code.";
+                thinkingText.textContent = "";
             }
         }
 
