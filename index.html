@@ -1,135 +1,151 @@
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Arduino Code Generator</title>
-    <title>Arduino Code Generator AI</title>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
     <style>
-        body { font-family: Arial, sans-serif; padding: 20px; background-color: #f9f9f9; color: #333; }
-        input, button { padding: 10px; margin: 10px; font-size: 16px; border-radius: 5px; border: 1px solid #ddd; }
-        #output { 
-            margin-top: 20px; 
-            padding: 10px; 
-            background-color: #f0f0f0; 
-            border-radius: 5px;
-            white-space: pre-wrap;
-            font-family: monospace;
-            min-height: 100px;
-            max-height: 300px;
-            overflow-y: auto;
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f9;
+            color: #333;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
         }
-        #loadingStatus {
-            font-style: italic;
-            color: #888;
-            margin-top: 10px;
+
+        h1 {
+            color: #4caf50;
         }
-        #generateCodeButton {
-            background-color: #4CAF50;
-            color: white;
+
+        textarea {
+            width: 90%;
+            max-width: 600px;
+            height: 150px;
+            margin: 10px 0;
+            padding: 10px;
+            font-size: 16px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            resize: none;
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            color: #fff;
+            background-color: #4caf50;
+            border: none;
+            border-radius: 8px;
             cursor: pointer;
+            transition: background-color 0.3s;
         }
-        #generateCodeButton:hover {
+
+        button:hover {
             background-color: #45a049;
         }
-        .typing-animation {
-            border-right: 2px solid #333;
-            display: inline-block;
-            padding-right: 5px;
-            animation: typing 2s steps(30) 1s forwards, blinkCaret 0.75s step-end infinite;
+
+        pre {
+            width: 90%;
+            max-width: 600px;
+            padding: 10px;
+            background-color: #222;
+            color: #f4f4f9;
+            font-size: 14px;
+            overflow-x: auto;
+            border-radius: 8px;
+            box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
         }
-        @keyframes typing {
-            from { width: 0; }
-            to { width: 100%; }
-        }
-        @keyframes blinkCaret {
-            50% { border-color: transparent; }
+
+        .footer {
+            margin-top: 20px;
+            font-size: 12px;
+            color: #777;
         }
     </style>
 </head>
 <body>
-    <h1>Arduino Code Generator AI</h1>
-    
-    <label for="userInput">Masukkan Deskripsi Fungsionalitas:</label>
-    <textarea id="userInput" rows="4" cols="50"></textarea>
-    
-    <br>
-    
-    <button id="generateCodeButton">Generate Code</button>
-    <div id="loadingStatus"></div>
-    <div id="output"></div>
+    <h1>Arduino Code Generator</h1>
+    <p>Masukkan deskripsi proyek Arduino Anda, lalu klik tombol "Generate" untuk mendapatkan kode otomatis.</p>
+    <textarea id="userInput" placeholder="Contoh: Mengukur suhu menggunakan sensor DHT11 dan menampilkan hasilnya di LCD"></textarea>
+    <button id="generateButton">Generate</button>
+    <pre id="outputCode">Kode akan muncul di sini...</pre>
+
+    <div class="footer">
+        <p>© 2025 Arduino Code Generator</p>
+    </div>
 
     <script>
-        let model, vocab;
-        
-        // Load model and vocabulary
-        export async function loadModelAndVocab() {
+        // Fungsi untuk memuat model TensorFlow
+        let model;
+        let vocab;
+
+        async function loadModelAndVocab() {
             try {
-                model = await tf.loadLayersModel('https://4211421036.github.io/codegenerator/ai_model/model.json');
-                const response = await fetch('https://4211421036.github.io/codegenerator/ai_model/vocab.json');
-                vocab = await response.json();
-                console.log("Model and vocabulary loaded successfully.");
+                model = await tf.loadLayersModel('./ai_model/model.json');
+                const vocabResponse = await fetch('./ai_model/vocab.json');
+                vocab = await vocabResponse.json();
+                console.log("Model dan vocabulary berhasil dimuat!");
             } catch (error) {
-                console.error("Failed to load model or vocabulary:", error);
+                console.error("Gagal memuat model atau vocabulary:", error);
             }
         }
-        
-        // Tokenize input text
-        function tokenize(text) {
-            const cleanText = text.toLowerCase().replace(/[^\w\s]/g, '');
-            const tokens = cleanText.split(/\s+/);
-            return tokens.slice(0, 50);
+
+        // Tokenisasi input
+        function tokenizeInput(input, maxLength) {
+            const tokens = input.toLowerCase().replace(/[^\w\s]/g, '').split(/\s+/);
+            const tokenToIndex = vocab.tokenToIndex;
+
+            const paddedTokens = [
+                tokenToIndex['<START>'],
+                ...tokens.map(token => tokenToIndex[token] || tokenToIndex['<PAD>']),
+                tokenToIndex['<END>']
+            ];
+
+            return tf.tensor2d([
+                [...paddedTokens, ...Array(maxLength - paddedTokens.length).fill(tokenToIndex['<PAD>'])]
+            ], [1, maxLength]);
         }
-        
-        // Convert tokens to numerical indices
-        function tokensToIndices(tokens) {
-            return tokens.map(token => {
-                const index = vocab.vocabulary.indexOf(token);
-                return index !== -1 ? index : 0;
-            });
-        }
-        
-        // Pad input to a fixed length
-        function padInput(indices, length) {
-            const paddedInput = [...indices];
-            while (paddedInput.length < length) {
-                paddedInput.push(0);
-            }
-            return paddedInput.slice(0, length);
-        }
-        
-        // Decode model output to code
-        function decodeOutput(outputTensor) {
-            const outputIndices = Array.from(outputTensor.argMax(-1).dataSync());
-            const tokens = outputIndices.map(index => vocab.vocabulary[index] || '');
-            return tokens.join(' ');
-        }
-        
-        // Generate code based on user input
-        export async function generateCode() {
-            const userInput = document.getElementById("userInput").value;
-            if (!userInput.trim()) {
-                alert("Please enter a description first.");
+
+        // Menghasilkan kode
+        async function generateCode() {
+            const inputField = document.getElementById('userInput');
+            const outputField = document.getElementById('outputCode');
+            const inputText = inputField.value;
+
+            if (!inputText || !model || !vocab) {
+                alert("Pastikan deskripsi proyek telah diisi dan model berhasil dimuat.");
                 return;
             }
-        
-            try {
-                // Tokenize and preprocess input
-                const tokens = tokenize(userInput);
-                const indices = tokensToIndices(tokens);
-                const paddedInput = padInput(indices, 50);
-                const inputTensor = tf.tensor2d([paddedInput]);
-        
-                // Generate code using the model
-                const prediction = model.predict(inputTensor);
-                const generatedCode = decodeOutput(prediction);
-        
-                // Display the generated code
-                document.getElementById('outputCode').textContent = generatedCode;
-            } catch (error) {
-                console.error("Failed to generate code:", error);
-                document.getElementById('outputCode').textContent = "Failed to generate code. Check the console for details.";
-            }
+
+            const maxLength = 150;
+            const inputTensor = tokenizeInput(inputText, maxLength);
+
+            const prediction = model.predict(inputTensor);
+            const outputIndices = prediction.argMax(-1).dataSync();
+            const generatedTokens = outputIndices
+                .map(index => vocab.vocabulary[index])
+                .filter(token => token && token !== '<PAD>' && token !== '<START>' && token !== '<END>');
+
+            const generatedCode = 
+void setup() {
+    ${generatedTokens.slice(0, 10).join(' ')}
+}
+
+void loop() {
+    ${generatedTokens.slice(10, 20).join(' ')}
+};
+            outputField.textContent = generatedCode;
         }
+
+        // Inisialisasi
+        document.getElementById('generateButton').addEventListener('click', generateCode);
+        loadModelAndVocab();
     </script>
 </body>
+</html>
