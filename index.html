@@ -60,8 +60,8 @@
         // Memuat model dan vocab dari URL (path disesuaikan)
         async function loadModelAndVocab() {
             try {
-                const modelResponse = await fetch('https://4211421036.github.io/ai_model/model.json'); // Ganti dengan path yang benar
-                const vocabResponse = await fetch('https://4211421036.github.io/ai_model/vocab.json'); // Ganti dengan path yang benar
+                const modelResponse = await fetch('https://4211421036.github.io/codegenerator/ai_model/model.json'); // Ganti dengan path yang benar
+                const vocabResponse = await fetch('https://4211421036.github.io/codegenerator/ai_model/vocab.json'); // Ganti dengan path yang benar
                 model = await modelResponse.json();
                 vocab = await vocabResponse.json();
                 console.log("Model dan Vocab berhasil dimuat.");
