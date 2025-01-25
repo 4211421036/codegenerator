@@ -37,60 +37,63 @@ class ArduinoCodeTrainer {
 
     createTrainingData(data) {
         const allTokens = new Set(['<PAD>', '<START>', '<END>']);
-
+    
         // Collect unique tokens
         data.forEach(({ input, output }) => {
             const inputTokens = this.tokenize(input);
             const outputTokens = this.tokenize(output);
-
+    
             inputTokens.forEach(token => allTokens.add(token));
             outputTokens.forEach(token => allTokens.add(token));
         });
-
+    
         const tokenToIndex = new Map(
             Array.from(allTokens).map((token, index) => [token, index])
         );
-
+    
         const inputs = [];
         const outputs = [];
-
+    
         data.forEach(({ input, output }) => {
             const inputTokens = ['<START>', ...this.tokenize(input), '<END>'];
             const outputTokens = ['<START>', ...this.tokenize(output), '<END>'];
-
+    
             const paddedInput = [
-                ...inputTokens,
-                ...Array(this.maxLength - inputTokens.length).fill('<PAD>')
-            ].slice(0, this.maxLength);
-
+                ...inputTokens.slice(0, this.maxLength), // Truncate if exceeds maxLength
+                ...Array(Math.max(0, this.maxLength - inputTokens.length)).fill('<PAD>') // Ensure valid padding length
+            ];
+    
             const paddedOutput = [
-                ...outputTokens,
-                ...Array(this.maxLength - outputTokens.length).fill('<PAD>')
-            ].slice(0, this.maxLength);
-
+                ...outputTokens.slice(0, this.maxLength), // Truncate if exceeds maxLength
+                ...Array(Math.max(0, this.maxLength - outputTokens.length)).fill('<PAD>') // Ensure valid padding length
+            ];
+    
             const oneHotOutput = paddedOutput.map(token => {
                 const oneHot = new Array(allTokens.size).fill(0);
                 const index = tokenToIndex.get(token);
-                oneHot[index] = 1;
+                if (index !== undefined) {
+                    oneHot[index] = 1;
+                }
                 return oneHot;
             });
-
+    
             inputs.push(paddedInput.map(token => tokenToIndex.get(token) || 0));
             outputs.push(oneHotOutput);
         });
-
+    
         const vocab = {
             vocabulary: Array.from(allTokens),
             total_tokens: allTokens.size,
             tokenToIndex: Object.fromEntries(tokenToIndex)
         };
-
+    
         return {
             inputs: tf.tensor2d(inputs, [inputs.length, this.maxLength]),
             outputs: tf.tensor3d(outputs, [outputs.length, this.maxLength, allTokens.size]),
             vocab: vocab
         };
     }
+
 
     createModel(vocabSize) {
         const model = tf.sequential();
