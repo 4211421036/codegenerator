@@ -70,16 +70,16 @@
             }
         }
 
-        // Scraping kode dari GitHub berdasarkan kata kunci tanpa token
-        async function fetchCodeFromGitHub(query) {
-            const url = `https://api.github.com/search/code?q=${encodeURIComponent(query)}+in:file+language:ino`;
+        // Fungsi untuk mengambil data dari server backend yang sudah memanggil GitHub API
+        async function fetchCodeFromServer(query) {
+            const url = `/search/github?query=${encodeURIComponent(query)}`;
 
             try {
                 const response = await fetch(url);
                 const data = await response.json();
-                return data.items;
+                return data;
             } catch (error) {
-                console.error("Gagal mengambil data dari GitHub:", error);
+                console.error("Gagal mengambil data dari server:", error);
                 return [];
             }
         }
@@ -96,7 +96,7 @@
 
             try {
                 // Ambil kode terkait dari GitHub
-                const githubResults = await fetchCodeFromGitHub(inputText);
+                const githubResults = await fetchCodeFromServer(inputText);
                 if (githubResults.length === 0) {
                     outputField.textContent = "Tidak ada kode yang ditemukan di GitHub.";
                     return;
