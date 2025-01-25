@@ -13,19 +13,31 @@
             justify-content: center;
             height: 100vh;
             background-color: #f4f4f9;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            width: 100%;
+            max-width: 800px;
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         }
         h1 {
             color: #4caf50;
+            text-align: center;
         }
         textarea, button, pre {
             margin: 10px 0;
             padding: 10px;
             font-size: 16px;
+            width: 100%;
+            box-sizing: border-box;
         }
         textarea {
-            width: 80%;
-            max-width: 600px;
             height: 100px;
+            resize: vertical;
         }
         button {
             background-color: #4caf50;
@@ -33,98 +45,136 @@
             border: none;
             border-radius: 8px;
             cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #45a049;
         }
         pre {
-            width: 80%;
-            max-width: 600px;
             background-color: #222;
             color: white;
-            padding: 10px;
             overflow-x: auto;
-            font-size: 14px;
             border-radius: 8px;
+            max-height: 400px;
+            overflow-y: auto;
         }
     </style>
 </head>
 <body>
-
-    <h1>Arduino Code Generator</h1>
-    <textarea id="userInput" placeholder="Masukkan deskripsi proyek Arduino..."></textarea>
-    <button id="generateButton">Generate Code</button>
-    <pre id="outputCode">Kode akan muncul di sini...</pre>
+    <div class="container">
+        <h1>Arduino Code Generator</h1>
+        <textarea id="userInput" placeholder="Describe your Arduino project..."></textarea>
+        <button id="generateButton">Generate Code</button>
+        <pre id="outputCode">Arduino code will appear here...</pre>
+    </div>
 
     <script>
-        let model = {};
-        let vocab = {};
+        class ArduinoCodeGenerator {
+            constructor() {
+                this.model = null;
+                this.vocab = null;
+            }
 
-        // Memuat model dan vocab dari URL (path disesuaikan)
-        async function loadModelAndVocab() {
-            try {
-                const modelResponse = await fetch('https://4211421036.github.io/codegenerator/ai_model/model.json'); // Ganti dengan path yang benar
-                const vocabResponse = await fetch('https://4211421036.github.io/codegenerator/ai_model/vocab.json'); // Ganti dengan path yang benar
-                model = await modelResponse.json();
-                vocab = await vocabResponse.json();
-                console.log("Model dan Vocab berhasil dimuat.");
-            } catch (error) {
-                console.error("Gagal memuat model atau vocab:", error);
+            async loadModelAndVocab() {
+                try {
+                    const [modelResponse, vocabResponse] = await Promise.all([
+                        fetch('https://4211421036.github.io/codegenerator/ai_model/model.json'),
+                        fetch('https://4211421036.github.io/codegenerator/ai_model/vocab.json')
+                    ]);
+                    
+                    this.model = await modelResponse.json();
+                    this.vocab = await vocabResponse.json();
+                    console.log("Model and Vocab successfully loaded.");
+                } catch (error) {
+                    console.error("Failed to load model or vocab:", error);
+                }
+            }
+
+            generateBaseTemplate() {
+                return `void setup() {
+  Serial.begin(9600);
+  // Add pin configurations here
+}
+
+void loop() {
+  // Add your main code logic here
+}`;
+            }
+
+            generateCodeFromInput(input) {
+                // Basic AI-assisted code generation logic
+                if (!this.model || !this.vocab) {
+                    return "Model or vocabulary not loaded.";
+                }
+
+                let generatedCode = this.generateBaseTemplate();
+
+                // Augment base template based on input and model
+                const keywords = this.extractKeywords(input);
+                
+                keywords.forEach(keyword => {
+                    if (this.model.pinConfigurations && this.model.pinConfigurations[keyword]) {
+                        generatedCode = this.updatePinConfiguration(generatedCode, keyword);
+                    }
+                    
+                    if (this.model.functionTemplates && this.model.functionTemplates[keyword]) {
+                        generatedCode = this.addFunctionTemplate(generatedCode, keyword);
+                    }
+                });
+
+                return generatedCode;
+            }
+
+            extractKeywords(input) {
+                const commonArduinoKeywords = [
+                    'led', 'sensor', 'motor', 'button', 'relay', 
+                    'temperature', 'humidity', 'light', 'sound'
+                ];
+                
+                return commonArduinoKeywords.filter(keyword => 
+                    input.toLowerCase().includes(keyword)
+                );
+            }
+
+            updatePinConfiguration(code, keyword) {
+                const pinConfig = this.model.pinConfigurations[keyword];
+                const setupRegex = /(Serial\.begin\(9600\);)\n/;
+                return code.replace(setupRegex, `$1\n  pinMode(${pinConfig.pin}, ${pinConfig.mode});\n`);
+            }
+
+            addFunctionTemplate(code, keyword) {
+                const functionTemplate = this.model.functionTemplates[keyword];
+                const loopRegex = /void loop\(\) {\n\s*\/\/ Add your main code logic here\n}/;
+                return code.replace(loopRegex, `void loop() {\n  ${functionTemplate}\n}`);
             }
         }
 
-        // Fungsi untuk mengambil data dari server backend yang sudah memanggil GitHub API
-        async function fetchCodeFromServer(query) {
-            const url = `/search/github?query=${encodeURIComponent(query)}`;
+        const codeGenerator = new ArduinoCodeGenerator();
 
-            try {
-                const response = await fetch(url);
-                const data = await response.json();
-                return data;
-            } catch (error) {
-                console.error("Gagal mengambil data dari server:", error);
-                return [];
-            }
-        }
-
-        // Fungsi untuk menggabungkan hasil dari GitHub dan model/vocab
         async function generateCode() {
             const inputText = document.getElementById('userInput').value;
             const outputField = document.getElementById('outputCode');
 
             if (!inputText) {
-                alert("Pastikan deskripsi proyek telah diisi.");
+                alert("Please enter a project description.");
                 return;
             }
 
             try {
-                // Ambil kode terkait dari GitHub
-                const githubResults = await fetchCodeFromServer(inputText);
-                if (githubResults.length === 0) {
-                    outputField.textContent = "Tidak ada kode yang ditemukan di GitHub.";
-                    return;
+                if (!codeGenerator.model) {
+                    await codeGenerator.loadModelAndVocab();
                 }
 
-                // Gabungkan hasil GitHub dan template dari vocab
-                const githubCode = githubResults[0].text;  // Mengambil kode pertama dari hasil pencarian
-                let combinedCode = `${vocab.placeholder}\n\n// Kode dari GitHub:\n${githubCode}`;
-
-                // Modifikasi kode dengan informasi dari model
-                if (model.parameters) {
-                    combinedCode += `\n\n// Menggunakan model parameter: ${JSON.stringify(model.parameters)}`;
-                }
-
-                // Tampilkan kode yang dihasilkan
-                outputField.textContent = combinedCode;
-
+                const arduinoCode = codeGenerator.generateCodeFromInput(inputText);
+                outputField.textContent = arduinoCode;
             } catch (error) {
-                console.error("Error saat menghasilkan kode:", error);
-                outputField.textContent = "Terjadi kesalahan saat menghasilkan kode.";
+                console.error("Error generating code:", error);
+                outputField.textContent = "An error occurred while generating code.";
             }
         }
 
-        // Event listener untuk tombol "Generate"
         document.getElementById('generateButton').addEventListener('click', generateCode);
-
-        // Memuat model dan vocab saat halaman dimuat
-        window.onload = loadModelAndVocab;
+        codeGenerator.loadModelAndVocab();
     </script>
 </body>
 </html>
