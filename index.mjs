@@ -5,48 +5,59 @@ import path from 'path';
 class ArduinoCodeTrainer {
     constructor(folderPath) {
         this.folderPath = folderPath;
-        this.maxLength = 150;
+        this.maxLength = 50; // Reduced max length
+        this.maxFiles = 10; // Limit number of files
     }
 
     preprocessData() {
-        const files = fs.readdirSync(this.folderPath);
-        const data = [];
+        try {
+            const files = fs.readdirSync(this.folderPath);
+            const data = [];
 
-        files.forEach(file => {
-            if (file.endsWith('.ino')) {
-                const content = fs.readFileSync(path.join(this.folderPath, file), 'utf8');
-                data.push({
-                    input: file.replace('.ino', ''),
-                    output: content.trim()
-                });
+            for (const file of files.slice(0, this.maxFiles)) {
+                if (file.endsWith('.ino')) {
+                    try {
+                        const content = fs.readFileSync(path.join(this.folderPath, file), 'utf8');
+                        data.push({
+                            input: file.replace('.ino', ''),
+                            output: content.trim()
+                        });
+                    } catch (fileReadError) {
+                        console.error(`Error reading file ${file}:`, fileReadError);
+                    }
+                }
             }
-        });
-        return data;
+            return data;
+        } catch (error) {
+            console.error('Error in preprocessData:', error);
+            return [];
+        }
     }
 
-    tokenize(text, maxLength = this.maxLength) {
+    tokenize(text) {
         return text
             .toLowerCase()
             .replace(/[^\w\s]/g, '')
             .split(/\s+/)
             .filter(token => token.length > 0)
-            .slice(0, maxLength);
+            .slice(0, this.maxLength);
     }
 
     createTrainingData(data) {
-        // Limit the number of files to process to prevent array overflow
-        const limitedData = data.slice(0, 50);
-        
+        if (data.length === 0) {
+            throw new Error('No data to process');
+        }
+
         const allTokens = new Set(['<PAD>', '<START>', '<END>']);
 
-        // Collect all unique tokens
-        limitedData.forEach(({ input, output }) => {
+        // Collect unique tokens
+        for (const { input, output } of data) {
             const inputTokens = this.tokenize(input);
             const outputTokens = this.tokenize(output);
 
             inputTokens.forEach(token => allTokens.add(token));
             outputTokens.forEach(token => allTokens.add(token));
-        });
+        }
 
         const tokenToIndex = new Map(
             Array.from(allTokens).map((token, index) => [token, index])
@@ -55,7 +66,7 @@ class ArduinoCodeTrainer {
         const inputs = [];
         const outputs = [];
 
-        limitedData.forEach(({ input, output }) => {
+        for (const { input, output } of data) {
             const inputTokens = ['<START>', ...this.tokenize(input), '<END>'];
             const outputTokens = ['<START>', ...this.tokenize(output), '<END>'];
 
@@ -78,7 +89,7 @@ class ArduinoCodeTrainer {
 
             inputs.push(paddedInput.map(token => tokenToIndex.get(token) || 0));
             outputs.push(oneHotOutput);
-        });
+        }
 
         const vocab = {
             vocabulary: Array.from(allTokens),
@@ -98,22 +109,13 @@ class ArduinoCodeTrainer {
 
         model.add(tf.layers.embedding({
             inputDim: vocabSize,
-            outputDim: 256,
+            outputDim: 64, // Reduced embedding size
             inputLength: this.maxLength
         }));
 
         model.add(tf.layers.lstm({
-            units: 512,
-            returnSequences: true,
-            recurrentDropout: 0.2
-        }));
-
-        model.add(tf.layers.dropout({ rate: 0.3 }));
-
-        model.add(tf.layers.lstm({
-            units: 512,
-            returnSequences: true,
-            recurrentDropout: 0.2
+            units: 128, // Reduced units
+            returnSequences: false // Changed to false
         }));
 
         model.add(tf.layers.dense({
@@ -123,7 +125,7 @@ class ArduinoCodeTrainer {
 
         model.compile({
             loss: 'categoricalCrossentropy',
-            optimizer: tf.train.adam(0.001),
+            optimizer: 'adam',
             metrics: ['accuracy']
         });
 
@@ -131,33 +133,33 @@ class ArduinoCodeTrainer {
     }
 
     async train() {
-        const rawData = this.preprocessData();
-        const { inputs, outputs, vocab } = this.createTrainingData(rawData);
+        try {
+            const rawData = this.preprocessData();
+            console.log(`Processing ${rawData.length} files`);
 
-        const model = this.createModel(vocab.total_tokens);
+            const { inputs, outputs, vocab } = this.createTrainingData(rawData);
 
-        console.log('Training model...');
-        const history = await model.fit(inputs, outputs, {
-            epochs: 50, // Reduced epochs to prevent potential memory issues
-            batchSize: 32, // Reduced batch size
-            validationSplit: 0.2,
-            callbacks: {
-                onEpochEnd: async (epoch, logs) => {
-                    console.log(`Epoch ${epoch}: loss = ${logs.loss}, accuracy = ${logs.accuracy}`);
-                }
-            }
-        });
+            const model = this.createModel(vocab.total_tokens);
 
-        // Save model, vocab, and weights
-        const modelPath = './ai_model';
-        await model.save(`file://${modelPath}`);
-        
-        fs.writeFileSync(
-            path.join(modelPath, 'vocab.json'),
-            JSON.stringify(vocab, null, 2)
-        );
+            console.log('Training model...');
+            await model.fit(inputs, outputs, {
+                epochs: 10,
+                batchSize: 16,
+                verbose: 1
+            });
 
-        console.log('Model training complete.');
+            const modelPath = './ai_model';
+            await model.save(`file://${modelPath}`);
+            
+            fs.writeFileSync(
+                path.join(modelPath, 'vocab.json'),
+                JSON.stringify(vocab, null, 2)
+            );
+
+            console.log('Model training complete.');
+        } catch (error) {
+            console.error('Training failed:', error);
+        }
     }
 }
 
