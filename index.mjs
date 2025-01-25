@@ -231,19 +231,25 @@ class ArduinoCodeTrainer {
         const { inputs, outputs, vocab } = this.createTrainingData(rawData);
 
         const model = this.createModel(vocab.total_tokens);
+        const splitIndex = Math.floor(inputs.shape[0] * 0.8);
+        const xTrain = inputs.slice([0, 0], [splitIndex, this.maxLength]);
+        const yTrain = outputs.slice([0, 0, 0], [splitIndex, this.maxLength, vocab.total_tokens]);
+        const xVal = inputs.slice([splitIndex, 0], [-1, this.maxLength]);
+        const yVal = outputs.slice([splitIndex, 0, 0], [-1, this.maxLength, vocab.total_tokens]);
 
         const history = await model.fit(inputs, outputs, {
             epochs: 100,
             batchSize: 32,
             validationSplit: 0.2,
+            validationData: [xVal, yVal],
             verbose: 1,
             callbacks: {
                 onEpochEnd: async (epoch, logs) => {
                     console.log(`Epoch ${epoch + 1}:`, 
                         `loss=${logs.loss.toFixed(4)}, ` +
-                        `accuracy=${logs.accuracy ? logs.accuracy.toFixed(4) : 'N/A'}`, 
+                        `accuracy=${(logs.accuracy * 100).toFixed(2)}%, ` +
                         `val_loss=${logs.val_loss.toFixed(4)}, ` +
-                        `val_accuracy=${logs.val_accuracy ? logs.val_accuracy.toFixed(4) : 'N/A'}`
+                        `val_accuracy=${(logs.val_accuracy * 100).toFixed(2)}%`
                     );
                 }
             }
