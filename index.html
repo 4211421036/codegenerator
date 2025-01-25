@@ -58,144 +58,78 @@
     <button id="generateCodeButton">Generate Code</button>
     <div id="loadingStatus"></div>
     <div id="output"></div>
-    <h1>Arduino Code Generator</h1>
-    <textarea id="userInput" rows="4" placeholder="Describe your Arduino project..."></textarea>
-    <button id="generateButton">Generate Code</button>
-    <pre id="outputCode"></pre>
 
     <script>
         let model, vocab;
-
-        // Memuat model dan vocabulary
-        async function loadModelAndVocab() {
+        
+        // Load model and vocabulary
+        export async function loadModelAndVocab() {
             try {
                 model = await tf.loadLayersModel('https://4211421036.github.io/codegenerator/ai_model/model.json');
-                
-                // Memuat vocabulary
-                const vocabResponse = await fetch('https://4211421036.github.io/codegenerator/ai_model/vocab.json');
-                vocab = await vocabResponse.json();
-                
-                console.log("Model dan Vocabulary berhasil dimuat.");
-                model = await tf.loadLayersModel('path/to/model.json');
-                const response = await fetch('path/to/vocab.json');
+                const response = await fetch('https://4211421036.github.io/codegenerator/ai_model/vocab.json');
                 vocab = await response.json();
+                console.log("Model and vocabulary loaded successfully.");
             } catch (error) {
-                console.error("Gagal memuat model atau vocabulary:", error);
-                console.error("Model loading failed:", error);
+                console.error("Failed to load model or vocabulary:", error);
             }
         }
-
-        // Fungsi tokenisasi yang lebih komprehensif
+        
+        // Tokenize input text
         function tokenize(text) {
             const cleanText = text.toLowerCase().replace(/[^\w\s]/g, '');
             const tokens = cleanText.split(/\s+/);
             return tokens.slice(0, 50);
         }
-        // Konversi token ke indeks numerik
+        
+        // Convert tokens to numerical indices
         function tokensToIndices(tokens) {
             return tokens.map(token => {
                 const index = vocab.vocabulary.indexOf(token);
                 return index !== -1 ? index : 0;
             });
         }
-        // Padding input
+        
+        // Pad input to a fixed length
         function padInput(indices, length) {
             const paddedInput = [...indices];
             while (paddedInput.length < length) {
                 paddedInput.push(0);
             }
             return paddedInput.slice(0, length);
-        function prepareInput(text) {
-            // Tokenize input, preserve structure
-            return text.toLowerCase()
-                .split(/\s+/)
-                .filter(token => token.length > 0)
-                .slice(0, 100);
         }
-
-        // Dekode output model kembali menjadi kode
+        
+        // Decode model output to code
         function decodeOutput(outputTensor) {
             const outputIndices = Array.from(outputTensor.argMax(-1).dataSync());
             const tokens = outputIndices.map(index => vocab.vocabulary[index] || '');
             return tokens.join(' ');
         }
-        // Fungsi untuk menampilkan animasi typing
-        function showTypingAnimation(text) {
-            const outputElement = document.getElementById("output");
-            outputElement.innerHTML = ''; // Kosongkan output sebelumnya
-            let i = 0;
-            const interval = setInterval(() => {
-                outputElement.innerHTML += text.charAt(i);
-                i++;
-                if (i === text.length) {
-                    clearInterval(interval);
-                }
-            }, 100);
-        }
-            const tokens = outputIndices
-                .map(index => vocab.vocabulary[index] || '')
-                .filter(token => token !== '');
-            // Reconstruct code with basic Arduino template
-            const reconstructedCode = [
-                "void setup() {",
-                "  // Setup code based on your description",
-                "}",
-                "",
-                "void loop() {",
-                "  // Generated loop logic",
-                "}"
-            ];
-
-        // Fungsi untuk menunjukkan status loading
-        function showLoadingStatus() {
-            const loadingElement = document.getElementById("loadingStatus");
-            loadingElement.textContent = "Memproses..."; // Tampilkan status loading
-            return tokens.join(' ');
-        }
-
-        // Generate kode berdasarkan input
-        async function generateCode() {
+        
+        // Generate code based on user input
+        export async function generateCode() {
             const userInput = document.getElementById("userInput").value;
             if (!userInput.trim()) {
-                alert("Masukkan deskripsi terlebih dahulu.");
+                alert("Please enter a description first.");
                 return;
             }
-            const input = document.getElementById('userInput').value;
-            const processedInput = prepareInput(input);
-            const inputTensor = tf.tensor2d([processedInput], [1, 100]);
-
+        
             try {
-                // Menampilkan animasi typing saat menunggu
-                showLoadingStatus();
-                // Tokenisasi dan preproses input
+                // Tokenize and preprocess input
                 const tokens = tokenize(userInput);
                 const indices = tokensToIndices(tokens);
                 const paddedInput = padInput(indices, 50);
                 const inputTensor = tf.tensor2d([paddedInput]);
-                // Simulasi delay untuk efek loading
-                await new Promise(resolve => setTimeout(resolve, 2000));
-                // Prediksi menggunakan model
+        
+                // Generate code using the model
                 const prediction = model.predict(inputTensor);
-                // Dekode dan tampilkan output dengan animasi typing
                 const generatedCode = decodeOutput(prediction);
-                showTypingAnimation(generatedCode);
-                // Hilangkan status loading setelah selesai
-                document.getElementById("loadingStatus").textContent = '';
-                
+        
+                // Display the generated code
                 document.getElementById('outputCode').textContent = generatedCode;
             } catch (error) {
-                console.error("Gagal generate kode:", error);
-                document.getElementById("output").textContent = "Gagal generate kode. Cek konsol untuk detail.";
-                document.getElementById("loadingStatus").textContent = '';
-                console.error("Code generation failed:", error);
+                console.error("Failed to generate code:", error);
+                document.getElementById('outputCode').textContent = "Failed to generate code. Check the console for details.";
             }
         }
-
-        // Event listener
-        document.getElementById("generateCodeButton").addEventListener("click", generateCode);
-        
-        // Muat model saat halaman dimuat
-        document.getElementById('generateButton').addEventListener('click', generateCode);
-        window.onload = loadModelAndVocab;
     </script>
 </body>
