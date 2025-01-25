@@ -97,37 +97,39 @@ class ArduinoCodeTrainer {
 
     createModel(vocabSize) {
         const model = tf.sequential();
-
+    
         model.add(tf.layers.embedding({
             inputDim: vocabSize,
             outputDim: 128,
             inputLength: this.maxLength
         }));
-
+    
         model.add(tf.layers.lstm({
             units: 256,
-            returnSequences: true
+            returnSequences: true // Perlu agar output berdimensi [batch_size, maxLength, 256]
         }));
-
+    
         model.add(tf.layers.dropout({ rate: 0.2 }));
-
+    
         model.add(tf.layers.lstm({
-            units: 256
+            units: 256,
+            returnSequences: true // Pastikan output tetap sequences
         }));
-
+    
         model.add(tf.layers.dense({
             units: vocabSize,
-            activation: 'softmax'
+            activation: 'softmax' // Output akhir [batch_size, maxLength, vocab_size]
         }));
-
+    
         model.compile({
             loss: 'categoricalCrossentropy',
             optimizer: 'adam',
             metrics: ['accuracy']
         });
-
+    
         return model;
     }
+
 
     async train() {
         const rawData = this.preprocessData();
@@ -137,7 +139,7 @@ class ArduinoCodeTrainer {
 
         await model.fit(inputs, outputs, {
             epochs: 50,
-            batchSize: 32,
+            batchSize: 16, // Kurangi jika memory error
             verbose: 1
         });
 
