@@ -132,7 +132,7 @@
                 .map(index => vocab.vocabulary[index])
                 .filter(token => token && token !== '<PAD>' && token !== '<START>' && token !== '<END>');
 
-            const generatedCode = 
+            const generatedCode = `
 void setup() {
     ${generatedTokens.slice(0, 10).join(' ')}
 }
@@ -141,7 +141,7 @@ void loop() {
     ${generatedTokens.slice(10, 20).join(' ')}
 };
             outputField.textContent = generatedCode;
-        }
+        }`
 
         // Inisialisasi
         document.getElementById('generateButton').addEventListener('click', generateCode);
