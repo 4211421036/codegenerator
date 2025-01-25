@@ -239,8 +239,12 @@ class ArduinoCodeTrainer {
             verbose: 1,
             callbacks: {
                 onEpochEnd: async (epoch, logs) => {
-                    console.log(`Epoch ${epoch + 1}: loss=${logs.loss}, accuracy=${logs.accuracy}`);
-                    console.log(`Validation loss=${logs.val_loss}, validation accuracy=${logs.val_accuracy}`);
+                    console.log(`Epoch ${epoch + 1}:`, 
+                        `loss=${logs.loss.toFixed(4)}, ` +
+                        `accuracy=${logs.accuracy ? logs.accuracy.toFixed(4) : 'N/A'}`, 
+                        `val_loss=${logs.val_loss.toFixed(4)}, ` +
+                        `val_accuracy=${logs.val_accuracy ? logs.val_accuracy.toFixed(4) : 'N/A'}`
+                    );
                 }
             }
         });
@@ -251,10 +255,14 @@ class ArduinoCodeTrainer {
         // Extract and save model details
         const modelDetails = this.extractAdvancedFeatures(rawData);
         modelDetails.trainingMetrics = {
-            bestAccuracy: Math.max(...history.history.accuracy),
-            bestValAccuracy: Math.max(...history.history.val_accuracy),
-            finalLoss: history.history.loss[history.history.loss.length - 1],
-            finalValLoss: history.history.val_loss[history.history.val_loss.length - 1]
+            accuracyHistory: history.history.accuracy || [],
+            valAccuracyHistory: history.history.val_accuracy || [],
+            lossHistory: history.history.loss || [],
+            valLossHistory: history.history.val_loss || [],
+            bestAccuracy: Math.max(...(history.history.accuracy || [0])),
+            bestValAccuracy: Math.max(...(history.history.val_accuracy || [0])),
+            finalLoss: history.history.loss ? history.history.loss[history.history.loss.length - 1] : null,
+            finalValLoss: history.history.val_loss ? history.history.val_loss[history.history.val_loss.length - 1] : null
         };
         
         fs.writeFileSync(
