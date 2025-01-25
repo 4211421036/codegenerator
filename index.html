@@ -115,6 +115,15 @@
             ], [1, maxLength]);
         }
 
+        // Fungsi untuk mencari kode secara online
+        async function fetchCodeOnline(query) {
+            const url = `https://www.arduino.cc/reference/en/?q=${encodeURIComponent(query)}`;
+            const response = await fetch(url);
+            const text = await response.text();
+            const codeMatch = text.match(/<code.*?>(.*?)<\/code>/s);
+            return codeMatch ? codeMatch[1] : "Kode tidak ditemukan. Silakan coba lagi.";
+        }
+
         // Fungsi untuk menghasilkan kode
         async function generateCode() {
             const inputField = document.getElementById('userInput');
@@ -147,7 +156,9 @@ void loop() {
                 outputField.textContent = generatedCode;
             } catch (error) {
                 console.error("Error saat menghasilkan kode:", error);
-                alert("Terjadi kesalahan saat menghasilkan kode. Silakan cek kembali input Anda.");
+                // Jika model gagal, coba cari kode secara online
+                const onlineCode = await fetchCodeOnline(inputText);
+                outputField.textContent = onlineCode;
             }
         }
 
