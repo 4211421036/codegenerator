@@ -19,16 +19,18 @@ function preprocessData(folderPath) {
 }
 
 function advancedTokenize(text, maxLength = 100) {
+    // More sophisticated tokenization
     return text
-        .split(/\n/)
-        .map(line => line.trim())
-        .filter(line => line.length > 0 && !line.startsWith('//'))
+        .toLowerCase()
+        .replace(/[^\w\s]/g, '')
+        .split(/\s+/)
+        .filter(token => token.length > 0)
         .slice(0, maxLength);
 }
 
 function createTrainingData(data) {
-    const maxLength = 100;
-    const allTokens = new Set(['<PAD>']);
+    const maxLength = 150;  // Increased max length
+    const allTokens = new Set(['<PAD>', '<START>', '<END>']);
 
     // Collect all unique tokens
     data.forEach(({ input, output }) => {
@@ -47,21 +49,21 @@ function createTrainingData(data) {
     const outputs = [];
 
     data.forEach(({ input, output }) => {
-        // Tokenize and pad input
-        const inputTokens = advancedTokenize(input, maxLength);
+        // Enhanced tokenization and padding
+        const inputTokens = ['<START>', ...advancedTokenize(input, maxLength-2), '<END>'];
+        const outputTokens = ['<START>', ...advancedTokenize(output, maxLength-2), '<END>'];
+
         const paddedInput = [
             ...inputTokens, 
             ...Array(maxLength - inputTokens.length).fill('<PAD>')
         ].slice(0, maxLength);
 
-        // Tokenize and pad output
-        const outputTokens = advancedTokenize(output, maxLength);
         const paddedOutput = [
             ...outputTokens, 
             ...Array(maxLength - outputTokens.length).fill('<PAD>')
         ].slice(0, maxLength);
 
-        // Create one-hot encoded output
+        // One-hot encoding with improved handling
         const oneHotOutput = paddedOutput.map(token => {
             const oneHot = new Array(allTokens.size).fill(0);
             const index = tokenToIndex.get(token);
@@ -75,7 +77,8 @@ function createTrainingData(data) {
 
     const vocab = {
         vocabulary: Array.from(allTokens),
-        total_tokens: allTokens.size
+        total_tokens: allTokens.size,
+        tokenToIndex: Object.fromEntries(tokenToIndex)
     };
 
     return {
@@ -91,22 +94,25 @@ async function trainAndSaveModel(folderPath, outputModelPath) {
 
     const model = tf.sequential();
 
+    // Enhanced model architecture
     model.add(tf.layers.embedding({
         inputDim: vocab.total_tokens,
-        outputDim: 128,
-        inputLength: 100
+        outputDim: 256,
+        inputLength: 150
     }));
     
     model.add(tf.layers.lstm({
-        units: 256, 
-        returnSequences: true
+        units: 512, 
+        returnSequences: true,
+        recurrentDropout: 0.2
     }));
     
     model.add(tf.layers.dropout({ rate: 0.3 }));
     
     model.add(tf.layers.lstm({ 
-        units: 256, 
-        returnSequences: true 
+        units: 512, 
+        returnSequences: true,
+        recurrentDropout: 0.2
     }));
     
     model.add(tf.layers.dense({ 
@@ -116,27 +122,84 @@ async function trainAndSaveModel(folderPath, outputModelPath) {
     
     model.compile({
         loss: 'categoricalCrossentropy',
-        optimizer: tf.train.adam(0.001)
+        optimizer: tf.train.adam(0.001),
+        metrics: ['accuracy']
     });
 
     console.log('Training model...');
-    await model.fit(inputs, outputs, {
-        epochs: 200,
-        batchSize: 32,
-        validationSplit: 0.2
+    const history = await model.fit(inputs, outputs, {
+        epochs: 500,
+        batchSize: 64,
+        validationSplit: 0.2,
+        callbacks: {
+            onEpochEnd: async (epoch, logs) => {
+                console.log(`Epoch ${epoch}: loss = ${logs.loss}, accuracy = ${logs.accuracy}`);
+            }
+        }
     });
 
     console.log('Saving model...');
     await model.save(`file://${outputModelPath}`);
     console.log('Model saved.');
 
-    // Save vocabulary
+    // Save vocabulary with more details
     fs.writeFileSync(
         path.join(outputModelPath, 'vocab.json'), 
         JSON.stringify(vocab, null, 2)
     );
+
+    return { model, vocab };
+}
+
+// Code generation function
+function generateArduinoCode(model, vocab, inputDescription) {
+    // Tokenize input
+    const inputTokens = advancedTokenize(inputDescription);
+    const maxLength = 150;
+
+    // Prepare input tensor
+    const tokenToIndex = vocab.tokenToIndex;
+    const paddedInput = [
+        tokenToIndex['<START>'],
+        ...inputTokens.map(token => tokenToIndex[token] || tokenToIndex['<PAD>']),
+        tokenToIndex['<END>'],
+        ...Array(maxLength - inputTokens.length - 2).fill(tokenToIndex['<PAD>'])
+    ].slice(0, maxLength);
+
+    const inputTensor = tf.tensor2d([paddedInput], [1, maxLength]);
+
+    // Generate prediction
+    const prediction = model.predict(inputTensor);
+    
+    // Decode output
+    const outputIndices = prediction.argMax(-1).dataSync();
+    const generatedTokens = outputIndices
+        .map(index => vocab.vocabulary[index])
+        .filter(token => token && token !== '<PAD>' && token !== '<START>' && token !== '<END>');
+
+    // Basic code template generation
+    return `// Generated Arduino Code for: ${inputDescription}
+void setup() {
+    // Initialization
+    ${generatedTokens.slice(0, 10).join(' ')}
+}
+
+void loop() {
+    // Main logic
+    ${generatedTokens.slice(10, 20).join(' ')}
+}`;
 }
 
 const folderPath = './arduino_code';
 const outputModelPath = './ai_model';
-trainAndSaveModel(folderPath, outputModelPath);
+
+async function main() {
+    const { model, vocab } = await trainAndSaveModel(folderPath, outputModelPath);
+    
+    // Example usage
+    const projectDescription = "Temperature sensor with LCD display";
+    const generatedCode = generateArduinoCode(model, vocab, projectDescription);
+    console.log(generatedCode);
+}
+
+main().catch(console.error);
