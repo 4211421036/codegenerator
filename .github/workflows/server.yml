@@ -27,6 +27,6 @@ jobs:
       run: |
         echo "Token is set successfully"
 
-    - name: Run server
+    - name: Run server and client
       run: |
-        npm start  # Menjalankan server
+        npm start  # Menjalankan server.js dan index.mjs secara bersamaan
