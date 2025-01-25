@@ -81,12 +81,12 @@
     </div>
 
     <script>
-        // Fungsi untuk memuat model TensorFlow
         let model;
         let vocab;
 
         async function loadModelAndVocab() {
             try {
+                // Memuat model TensorFlow dan vocab
                 model = await tf.loadLayersModel('./ai_model/model.json');
                 const vocabResponse = await fetch('./ai_model/vocab.json');
                 vocab = await vocabResponse.json();
@@ -101,18 +101,20 @@
             const tokens = input.toLowerCase().replace(/[^\w\s]/g, '').split(/\s+/);
             const tokenToIndex = vocab.tokenToIndex;
 
+            // Padded tokens untuk input
             const paddedTokens = [
                 tokenToIndex['<START>'],
                 ...tokens.map(token => tokenToIndex[token] || tokenToIndex['<PAD>']),
                 tokenToIndex['<END>']
             ];
 
-            return tf.tensor2d([
-                [...paddedTokens, ...Array(maxLength - paddedTokens.length).fill(tokenToIndex['<PAD>'])]
-            ], [1, maxLength]);
+            return tf.tensor2d([[
+                ...paddedTokens, 
+                ...Array(maxLength - paddedTokens.length).fill(tokenToIndex['<PAD>'])
+            ]], [1, maxLength]);
         }
 
-        // Menghasilkan kode
+        // Fungsi untuk generate kode Arduino
         async function generateCode() {
             const inputField = document.getElementById('userInput');
             const outputField = document.getElementById('outputCode');
@@ -126,24 +128,26 @@
             const maxLength = 150;
             const inputTensor = tokenizeInput(inputText, maxLength);
 
+            // Melakukan prediksi dengan model
             const prediction = model.predict(inputTensor);
             const outputIndices = prediction.argMax(-1).dataSync();
             const generatedTokens = outputIndices
                 .map(index => vocab.vocabulary[index])
                 .filter(token => token && token !== '<PAD>' && token !== '<START>' && token !== '<END>');
 
-            const generatedCode = `
-void setup() {
+            // Membuat kode Arduino
+            const generatedCode = `void setup() {
     ${generatedTokens.slice(0, 10).join(' ')}
 }
 
 void loop() {
     ${generatedTokens.slice(10, 20).join(' ')}
 }`;
+
             outputField.textContent = generatedCode;
         }
 
-        // Inisialisasi
+        // Inisialisasi dan Event Listener
         document.getElementById('generateButton').addEventListener('click', generateCode);
         loadModelAndVocab();
     </script>
