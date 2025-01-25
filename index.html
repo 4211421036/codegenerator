@@ -81,7 +81,6 @@
     </div>
 
     <script>
-        // Fungsi untuk memuat model TensorFlow
         let model;
         let vocab;
 
@@ -96,54 +95,66 @@
             }
         }
 
-        // Tokenisasi input
         function tokenizeInput(input, maxLength) {
             const tokens = input.toLowerCase().replace(/[^\w\s]/g, '').split(/\s+/);
             const tokenToIndex = vocab.tokenToIndex;
 
-            const paddedTokens = [
+            const tokenized = [
                 tokenToIndex['<START>'],
                 ...tokens.map(token => tokenToIndex[token] || tokenToIndex['<PAD>']),
                 tokenToIndex['<END>']
             ];
 
-            return tf.tensor2d([
-                [...paddedTokens, ...Array(maxLength - paddedTokens.length).fill(tokenToIndex['<PAD>'])]
-            ], [1, maxLength]);
+            // Pastikan panjangnya sesuai dengan maxLength
+            return tf.tensor2d([[
+                ...tokenized.slice(0, maxLength),
+                ...Array(Math.max(0, maxLength - tokenized.length)).fill(tokenToIndex['<PAD>'])
+            ]]);
         }
 
-        // Menghasilkan kode
         async function generateCode() {
             const inputField = document.getElementById('userInput');
             const outputField = document.getElementById('outputCode');
-            const inputText = inputField.value;
+            const inputText = inputField.value.trim();
 
-            if (!inputText || !model || !vocab) {
-                alert("Pastikan deskripsi proyek telah diisi dan model berhasil dimuat.");
+            if (!inputText) {
+                alert("Deskripsi proyek tidak boleh kosong!");
                 return;
             }
 
-            const maxLength = 150;
-            const inputTensor = tokenizeInput(inputText, maxLength);
+            if (!model || !vocab) {
+                alert("Model atau vocabulary belum dimuat. Mohon tunggu beberapa saat.");
+                return;
+            }
 
-            const prediction = model.predict(inputTensor);
-            const outputIndices = prediction.argMax(-1).dataSync();
-            const generatedTokens = outputIndices
-                .map(index => vocab.vocabulary[index])
-                .filter(token => token && token !== '<PAD>' && token !== '<START>' && token !== '<END>');
+            try {
+                const maxLength = 150;
+                const inputTensor = tokenizeInput(inputText, maxLength);
+                const prediction = model.predict(inputTensor);
+                const outputIndices = prediction.argMax(-1).dataSync();
 
-            const generatedCode = `
-void setup() {
-    ${generatedTokens.slice(0, 10).join(' ')}
-}
+                const generatedTokens = Array.from(outputIndices)
+                    .map(index => vocab.vocabulary[index])
+                    .filter(token => token && !['<PAD>', '<START>', '<END>'].includes(token));
 
-void loop() {
-    ${generatedTokens.slice(10, 20).join(' ')}
-};
-            outputField.textContent = generatedCode;
-        }`
+                const setupCode = generatedTokens.slice(0, 10).join(' ');
+                const loopCode = generatedTokens.slice(10).join(' ');
 
-        // Inisialisasi
+                const generatedCode = `
+                    void setup() {
+                        ${setupCode || '// Tambahkan kode setup di sini'}
+                    }
+                    
+                    void loop() {
+                        ${loopCode || '// Tambahkan kode loop di sini'}
+                    }`;
+                outputField.textContent = generatedCode;
+            } catch (error) {
+                console.error("Error saat menghasilkan kode:", error);
+                alert("Terjadi kesalahan saat menghasilkan kode. Periksa konsol untuk detailnya.");
+            }
+        }
+
         document.getElementById('generateButton').addEventListener('click', generateCode);
         loadModelAndVocab();
     </script>
