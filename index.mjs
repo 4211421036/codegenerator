@@ -5,8 +5,8 @@ import path from 'path';
 class ArduinoCodeTrainer {
     constructor(folderPath) {
         this.folderPath = folderPath;
-        this.maxLength = 50; // Reduced max length
-        this.maxFiles = 10; // Limit number of files
+        this.maxLength = 20; // Further reduced
+        this.maxFiles = 5; // Even fewer files
     }
 
     preprocessData() {
@@ -14,13 +14,20 @@ class ArduinoCodeTrainer {
             const files = fs.readdirSync(this.folderPath);
             const data = [];
 
+            console.log('Total files found:', files.length);
+
             for (const file of files.slice(0, this.maxFiles)) {
                 if (file.endsWith('.ino')) {
                     try {
                         const content = fs.readFileSync(path.join(this.folderPath, file), 'utf8');
+                        const processedInput = file.replace('.ino', '');
+                        const processedOutput = content.trim().slice(0, 500); // Limit content length
+
+                        console.log(`File: ${file}, Input length: ${processedInput.length}, Output length: ${processedOutput.length}`);
+
                         data.push({
-                            input: file.replace('.ino', ''),
-                            output: content.trim()
+                            input: processedInput,
+                            output: processedOutput
                         });
                     } catch (fileReadError) {
                         console.error(`Error reading file ${file}:`, fileReadError);
@@ -44,9 +51,7 @@ class ArduinoCodeTrainer {
     }
 
     createTrainingData(data) {
-        if (data.length === 0) {
-            throw new Error('No data to process');
-        }
+        console.log('Creating training data with:', data.length, 'entries');
 
         const allTokens = new Set(['<PAD>', '<START>', '<END>']);
 
@@ -54,6 +59,8 @@ class ArduinoCodeTrainer {
         for (const { input, output } of data) {
             const inputTokens = this.tokenize(input);
             const outputTokens = this.tokenize(output);
+
+            console.log(`Input tokens: ${inputTokens.length}, Output tokens: ${outputTokens.length}`);
 
             inputTokens.forEach(token => allTokens.add(token));
             outputTokens.forEach(token => allTokens.add(token));
@@ -89,6 +96,8 @@ class ArduinoCodeTrainer {
 
             inputs.push(paddedInput.map(token => tokenToIndex.get(token) || 0));
             outputs.push(oneHotOutput);
+
+            console.log(`Inputs length: ${inputs.length}, Outputs length: ${outputs.length}`);
         }
 
         const vocab = {
@@ -109,14 +118,11 @@ class ArduinoCodeTrainer {
 
         model.add(tf.layers.embedding({
             inputDim: vocabSize,
-            outputDim: 64, // Reduced embedding size
+            outputDim: 32,
             inputLength: this.maxLength
         }));
 
-        model.add(tf.layers.lstm({
-            units: 128, // Reduced units
-            returnSequences: false // Changed to false
-        }));
+        model.add(tf.layers.flatten());
 
         model.add(tf.layers.dense({
             units: vocabSize,
@@ -143,8 +149,8 @@ class ArduinoCodeTrainer {
 
             console.log('Training model...');
             await model.fit(inputs, outputs, {
-                epochs: 10,
-                batchSize: 16,
+                epochs: 5,
+                batchSize: 1,
                 verbose: 1
             });
 
@@ -159,6 +165,7 @@ class ArduinoCodeTrainer {
             console.log('Model training complete.');
         } catch (error) {
             console.error('Training failed:', error);
+            console.error('Error stack:', error.stack);
         }
     }
 }
