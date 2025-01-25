@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Arduino Code Generator</title>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -81,93 +80,70 @@
     </div>
 
     <script>
-        // Variabel untuk model dan vocab
-        let model;
-        let vocab;
+        // Fungsi untuk mengambil kode dari GitHub
+        async function fetchCodeFromGitHub(query) {
+            const apiUrl = `https://api.github.com/search/code?q=${query}+in:file+language:ino`;
+            const response = await fetch(apiUrl);
+            const data = await response.json();
 
-        // Fungsi untuk memuat model TensorFlow dan vocabulary
-        async function loadModelAndVocab() {
-            try {
-                model = await tf.loadLayersModel('./ai_model/model.json');
-                const vocabResponse = await fetch('./ai_model/vocab.json');
-                vocab = await vocabResponse.json();
-                console.log("Model dan vocabulary berhasil dimuat!");
-            } catch (error) {
-                console.error("Gagal memuat model atau vocabulary:", error);
+            if (data.items && data.items.length > 0) {
+                // Ambil file kode pertama yang ditemukan
+                const fileUrl = data.items[0].html_url;
+                return fileUrl;
+            } else {
+                return "Tidak ada kode ditemukan di GitHub.";
             }
         }
 
-        // Fungsi untuk tokenisasi input
-        function tokenizeInput(input, maxLength) {
-            const tokens = input.toLowerCase().replace(/[^\w\s]/g, '').split(/\s+/);
-            const tokenToIndex = vocab.tokenToIndex;
-
-            const paddedTokens = [
-                tokenToIndex['<START>'],
-                ...tokens.slice(0, maxLength - 2).map(token => tokenToIndex[token] || tokenToIndex['<PAD>']),
-                tokenToIndex['<END>']
-            ];
-
-            console.log(`Jumlah token: ${paddedTokens.length}, maxLength: ${maxLength}`);
-
-            return tf.tensor2d([
-                [...paddedTokens, ...Array(maxLength - paddedTokens.length).fill(tokenToIndex['<PAD>'])]
-            ], [1, maxLength]);
+        // Fungsi untuk mengambil model dan vocab JSON, Anda dapat mengonfigurasi ini sesuai kebutuhan
+        async function loadModelAndVocab() {
+            // Contoh model dan vocab yang dapat Anda sesuaikan
+            const model = await fetch('model.json').then(res => res.json());
+            const vocab = await fetch('vocab.json').then(res => res.json());
+            return { model, vocab };
         }
 
-        // Fungsi untuk mencari kode secara online
-        async function fetchCodeFromWeb(query) {
-            // Ini adalah contoh sederhana. Anda bisa menggunakan API atau pencarian kode lebih lanjut
-            const response = await fetch(`https://api.arduino.cc/v1/code/search?q=${query}`);
-            const data = await response.json();
-            return data.codeSnippet || "Tidak ada kode ditemukan.";
+        // Fungsi untuk memproses dan menambahkan komentar ke kode yang diambil
+        function addCommentsToCode(code) {
+            // Komentar bisa ditambahkan berdasarkan analisis dari model dan vocab
+            let commentedCode = code;
+            // Misalnya menambahkan komentar umum
+            commentedCode = `// Kode ini diambil dari GitHub berdasarkan pencarian.\n\n` + commentedCode;
+            commentedCode = `// Proyek ini: ${document.getElementById('userInput').value}\n\n` + commentedCode;
+            return commentedCode;
         }
 
-        // Fungsi untuk menghasilkan kode
-
+        // Fungsi utama untuk menghasilkan kode
         async function generateCode() {
             const inputField = document.getElementById('userInput');
             const outputField = document.getElementById('outputCode');
             const inputText = inputField.value;
-        
-            if (!inputText || !model || !vocab) {
-                alert("Pastikan deskripsi proyek telah diisi dan model berhasil dimuat.");
+
+            if (!inputText) {
+                alert("Pastikan deskripsi proyek telah diisi.");
                 return;
             }
-        
-            const maxLength = 100; // Panjang maksimum sesuai model
-            const inputTensor = tokenizeInput(inputText, maxLength);
-        
+
             try {
-                const prediction = model.predict(inputTensor);
-                const outputIndices = prediction.argMax(-1).dataSync();
-                const generatedTokens = outputIndices
-                    .map(index => vocab.vocabulary[index])
-                    .filter(token => token && token !== '<PAD>' && token !== '<START>' && token !== '<END>');
-        
-                if (generatedTokens.length === 0) {
-                    // Jika model gagal menghasilkan kode, cari alternatif di internet
-                    const alternativeCode = await fetchCodeFromWeb(inputText);
-                    outputField.textContent = alternativeCode;
-                } else {
-                    const generatedCode = `
-        void setup() {
-            ${generatedTokens.slice(0, 10).join(' ')}
-        }
-        
-        void loop() {
-            ${generatedTokens.slice(10, 20).join(' ')}
-        }`;
-                    outputField.textContent = generatedCode;
-                }
+                // Mengambil kode dari GitHub berdasarkan input pengguna
+                let generatedCode = await fetchCodeFromGitHub(inputText);
+
+                // Mengambil model dan vocab untuk menyesuaikan kode (jika diperlukan)
+                let { model, vocab } = await loadModelAndVocab();
+
+                // Menambahkan komentar ke kode yang diambil
+                generatedCode = addCommentsToCode(generatedCode);
+
+                // Menampilkan kode yang sudah diproses
+                outputField.textContent = generatedCode;
             } catch (error) {
                 console.error("Error saat menghasilkan kode:", error);
-                alert("Terjadi kesalahan saat menghasilkan kode. Silakan cek kembali input Anda.");
+                outputField.textContent = "Terjadi kesalahan saat mengambil kode.";
             }
         }
-        // Inisialisasi
+
+        // Event listener untuk tombol "Generate"
         document.getElementById('generateButton').addEventListener('click', generateCode);
-        loadModelAndVocab();
     </script>
 </body>
 </html>
