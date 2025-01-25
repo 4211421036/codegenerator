@@ -2,6 +2,7 @@ import * as tf from '@tensorflow/tfjs-node';
 import fs from 'fs';
 import path from 'path';
 
+// Fungsi untuk memproses data dari folder .ino
 function preprocessData(folderPath) {
     const files = fs.readdirSync(folderPath);
     return files
@@ -12,6 +13,7 @@ function preprocessData(folderPath) {
         }));
 }
 
+// Tokenisasi teks dengan panjang maksimal
 function advancedTokenize(text, maxLength = 100) {
     return text
         .toLowerCase()
@@ -21,6 +23,7 @@ function advancedTokenize(text, maxLength = 100) {
         .slice(0, maxLength);
 }
 
+// Membuat data pelatihan
 function createTrainingData(data) {
     const maxLength = 150;
     const tokensSet = new Set(['<PAD>', '<START>', '<END>']);
@@ -60,6 +63,7 @@ function createTrainingData(data) {
     };
 }
 
+// Pelatihan model
 async function trainModel(dataPath, outputPath) {
     const data = preprocessData(dataPath);
     const { inputs, outputs, vocab } = createTrainingData(data);
@@ -89,39 +93,13 @@ async function trainModel(dataPath, outputPath) {
     console.log('Model trained and saved!');
 }
 
-async function generateArduinoCode(model, vocab, inputDescription) {
-    const inputTokens = advancedTokenize(inputDescription, 150);
-    const tokenToIndex = vocab.tokenToIndex;
-    const paddedInput = [
-        tokenToIndex['<START>'],
-        ...inputTokens.map((token) => tokenToIndex[token] || tokenToIndex['<PAD>']),
-        tokenToIndex['<END>'],
-    ].slice(0, 150);
-
-    const inputTensor = tf.tensor2d([paddedInput], [1, 150]);
-    const prediction = model.predict(inputTensor).arraySync()[0];
-
-    const outputTokens = prediction
-        .map((prob, index) => ({ token: vocab.vocabulary[index], prob }))
-        .filter(({ token }) => token !== '<PAD>' && token !== '<START>' && token !== '<END>')
-        .sort((a, b) => b.prob - a.prob)
-        .map(({ token }) => token);
-
-    return `void setup() {\n  ${outputTokens.slice(0, 10).join(' ')}\n}\n\nvoid loop() {\n  ${outputTokens.slice(10).join(' ')}\n}`;
-}
-
+// Main function
 async function main() {
-    const folderPath = './arduino_code';
-    const outputModelPath = './ai_model';
+    const folderPath = './arduino_code'; // Folder .ino
+    const outputModelPath = './ai_model'; // Output model
 
     await trainModel(folderPath, outputModelPath);
-
-    const model = await tf.loadLayersModel(`file://${outputModelPath}/model.json`);
-    const vocab = JSON.parse(fs.readFileSync(path.join(outputModelPath, 'vocab.json'), 'utf8'));
-
-    const userDescription = 'Temperature sensor with LCD display';
-    const arduinoCode = await generateArduinoCode(model, vocab, userDescription);
-    console.log(arduinoCode);
+    console.log('Model and vocabulary are ready for use!');
 }
 
 main().catch(console.error);
