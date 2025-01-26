@@ -96,7 +96,7 @@
                     if (template.keywords && Array.isArray(template.keywords)) {
                         template.keywords.forEach(keyword => {
                             // Check if the keyword is a string and not undefined
-                            if (typeof keyword === 'string' && keyword) {
+                            if (typeof keyword === 'string' && keyword.trim() !== '') {
                                 console.log("Checking keyword:", keyword);
                                 // Check if the input contains the keyword
                                 if (processedInput.includes(keyword.toLowerCase())) {
