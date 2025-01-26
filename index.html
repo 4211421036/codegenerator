@@ -61,18 +61,20 @@
     
         async generateCode(input) {
             if (!this.model) {
+                console.error("AI Model not loaded. Please try again.");
                 return "AI Model not loaded. Please try again.";
             }
     
             // Ensure that the model has the expected structure
             if (!this.model.templates || !Array.isArray(this.model.templates)) {
+                console.error("Model structure is incorrect. Templates are missing or not in the correct format.");
                 return "Model structure is incorrect.";
             }
     
-            // Edit input to align with the correct format based on the model
+            // Process input and generate the code
             const processedInput = this.processInput(input);
     
-            // Build code dynamically based on the model and input
+            // Build the code dynamically based on the processed input
             const code = this.buildCodeFromInput(processedInput);
             return code;
         }
@@ -80,23 +82,32 @@
         processInput(input) {
             // Validate input before using it
             if (typeof input !== 'string') {
-                console.error("Invalid input: expected a string");
-                return "";
+                console.error("Invalid input: expected a string, but got:", typeof input);
+                return ""; // Return empty if input is not a valid string
             }
     
             let processedInput = input.toLowerCase(); // Make input lowercase for consistency
     
-            // Ensure the model contains templates with the expected keywords
-            if (this.model.templates) {
+            // Ensure the model contains templates with the expected structure
+            if (this.model.templates && Array.isArray(this.model.templates)) {
                 this.model.templates.forEach(template => {
                     if (template.keywords && Array.isArray(template.keywords)) {
                         template.keywords.forEach(keyword => {
-                            if (typeof keyword === 'string' && processedInput.includes(keyword.toLowerCase())) {
-                                processedInput = processedInput.replace(keyword.toLowerCase(), template.name.toLowerCase());
+                            if (typeof keyword === 'string') {
+                                console.log("Checking keyword:", keyword);
+                                if (processedInput.includes(keyword.toLowerCase())) {
+                                    processedInput = processedInput.replace(keyword.toLowerCase(), template.name.toLowerCase());
+                                }
+                            } else {
+                                console.error("Invalid keyword type. Expected string, got:", typeof keyword);
                             }
                         });
+                    } else {
+                        console.error("Template has no keywords or keywords is not an array");
                     }
                 });
+            } else {
+                console.error("Model has no templates or templates is not an array");
             }
     
             return processedInput;
@@ -107,7 +118,7 @@
             let usedLibraries = new Set();
     
             // Ensure the model contains templates with expected structure
-            if (this.model.templates) {
+            if (this.model.templates && Array.isArray(this.model.templates)) {
                 this.model.templates.forEach(template => {
                     if (input.includes(template.name.toLowerCase())) {
                         // Add libraries for this template
@@ -125,11 +136,17 @@
                             template.functions.forEach(func => {
                                 if (func.name && func.body) {
                                     code += `\nvoid ${func.name}() {\n  ${func.body}\n}\n`;
+                                } else {
+                                    console.error("Invalid function format: missing name or body");
                                 }
                             });
+                        } else {
+                            console.error("Template functions are missing or not an array");
                         }
                     }
                 });
+            } else {
+                console.error("Model has no templates or templates is not an array");
             }
     
             // Add loop function if no matches were found
