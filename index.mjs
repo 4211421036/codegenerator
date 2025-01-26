@@ -146,8 +146,14 @@ class TemplateExtractor {
         await model.save(`file://${modelPath}`);
 
         const vocabPath = path.join(modelPath, 'vocab.json');
+        // Dynamically save the extracted templates to model.json
+        const modelJson = {
+            templates: templates,
+            vocab: Array.from(vocab)
+        };
 
-        fs.writeFileSync(path.join(modelPath, 'model.json'), JSON.stringify(templates, null, 2));
+        // Save both model and vocabulary
+        fs.writeFileSync(path.join(modelPath, 'model.json'), JSON.stringify(modelJson, null, 2));
         fs.writeFileSync(vocabPath, JSON.stringify(Array.from(vocab), null, 2));
 
         console.log('Templates and vocabulary saved.');
