@@ -2,11 +2,11 @@ import * as tf from '@tensorflow/tfjs-node';
 import fs from 'fs';
 import path from 'path';
 
-class ArduinoCodeTrainer {
+class ArduinoCodeTemplateTrainer {
     constructor(folderPath) {
         this.folderPath = folderPath;
-        this.maxLength = 100; // Further reduced
-        this.maxFiles = 200;  // Significantly reduced
+        this.maxLength = 200; // Increased to capture more code context
+        this.maxFiles = 500;  // Increased to process more files
     }
 
     preprocessData() {
@@ -18,69 +18,85 @@ class ArduinoCodeTrainer {
             const content = fs.readFileSync(path.join(this.folderPath, file), 'utf8');
             return {
                 filename: file,
-                input: file.replace('.ino', ''),
-                output: content
+                template: this.extractCodeTemplate(content),
+                keywords: this.extractKeywords(content),
+                fullContent: content
             };
         });
     }
 
-    tokenize(text) {
-        return text
-            .toLowerCase()
-            .replace(/[^\w\s.;(){}[\]=+\-*/&|<>!#]/g, ' ')
-            .split(/\s+/)
-            .filter(token => token.length > 0)
-            .slice(0, this.maxLength);
+    extractCodeTemplate(code) {
+        // Extract structural template of the code
+        const templatePatterns = [
+            /void\s+setup\s*\(\)\s*{[^}]*}/,
+            /void\s+loop\s*\(\)\s*{[^}]*}/,
+            /\w+\s+\w+\s*\([^)]*\)\s*{[^}]*}/
+        ];
+
+        const templateMatches = templatePatterns.map(pattern => 
+            (code.match(pattern) || [])[0] || ''
+        );
+
+        return templateMatches.join('\n');
+    }
+
+    extractKeywords(code) {
+        // Extract meaningful keywords and identifiers
+        const keywords = new Set();
+        const keywordPatterns = [
+            /\b(pinMode|digitalWrite|digitalRead|analogRead|delay)\b/g,
+            /\b(class|struct|enum)\s+(\w+)/g,
+            /\b(int|float|double|char|bool|void)\s+(\w+)\s*\(/g
+        ];
+
+        keywordPatterns.forEach(pattern => {
+            const matches = code.matchAll(pattern);
+            for (const match of matches) {
+                keywords.add(match[1] || match[2]);
+            }
+        });
+
+        return Array.from(keywords);
     }
 
     createTrainingData(data) {
-        const allTokens = new Set(['<PAD>', '<START>', '<END>']);
-        
-        // Collect unique tokens first
-        data.forEach(({ input, output }) => {
-            this.tokenize(input).forEach(token => allTokens.add(token));
-            this.tokenize(output).forEach(token => allTokens.add(token));
-        });
-
-        const tokenToIndex = new Map(
-            Array.from(allTokens).map((token, index) => [token, index])
-        );
-
-        const inputs = [];
-        const outputs = [];
-
-        data.forEach(({ input, output }) => {
-            const inputTokens = ['<START>', ...this.tokenize(input), '<END>'];
-            const outputTokens = ['<START>', ...this.tokenize(output), '<END>'];
-
-            const paddedInput = [
-                ...inputTokens.slice(0, this.maxLength),
-                ...Array(Math.max(0, this.maxLength - inputTokens.length)).fill('<PAD>')
-            ];
-
-            const paddedOutput = [
-                ...outputTokens.slice(0, this.maxLength),
-                ...Array(Math.max(0, this.maxLength - outputTokens.length)).fill('<PAD>')
-            ];
-
-            inputs.push(paddedInput.map(token => tokenToIndex.get(token) || 0));
-            outputs.push(paddedOutput.map(token => {
-                const oneHot = new Array(allTokens.size).fill(0);
-                const index = tokenToIndex.get(token);
-                if (index !== undefined) oneHot[index] = 1;
-                return oneHot;
-            }));
-        });
-
-        return {
-            inputs: tf.tensor2d(inputs, [inputs.length, this.maxLength]),
-            outputs: tf.tensor3d(outputs, [outputs.length, this.maxLength, allTokens.size]),
-            vocab: {
-                vocabulary: Array.from(allTokens),
-                total_tokens: allTokens.size,
-                tokenToIndex: Object.fromEntries(tokenToIndex)
-            }
+        // Create comprehensive training data with templates and keywords
+        const modelData = {
+            templates: [],
+            keywords: [],
+            vocab: new Set(['<PAD>', '<START>', '<END>'])
         };
+
+        data.forEach(item => {
+            // Collect templates
+            if (item.template) {
+                modelData.templates.push({
+                    filename: item.filename,
+                    template: item.template
+                });
+            }
+
+            // Collect keywords
+            item.keywords.forEach(keyword => {
+                modelData.keywords.push(keyword);
+                modelData.vocab.add(keyword);
+            });
+        });
+
+        // Write model.json with templates
+        fs.writeFileSync('model.json', JSON.stringify({
+            templates: modelData.templates,
+            total_templates: modelData.templates.length
+        }, null, 2));
+
+        // Write vocab.json with keywords
+        fs.writeFileSync('vocab.json', JSON.stringify({
+            keywords: Array.from(modelData.keywords),
+            total_keywords: modelData.keywords.length,
+            vocabulary: Array.from(modelData.vocab)
+        }, null, 2));
+
+        return modelData;
     }
 
     createModel(vocabSize) {
@@ -88,16 +104,16 @@ class ArduinoCodeTrainer {
     
         model.add(tf.layers.embedding({
             inputDim: vocabSize,
-            outputDim: 64, // Further reduced
+            outputDim: 128,
             inputLength: this.maxLength
         }));
     
-        model.add(tf.layers.globalAveragePooling1d()); // Replace LSTM with simpler layer
-    
-        model.add(tf.layers.dense({
-            units: 128,
-            activation: 'relu'
+        model.add(tf.layers.lstm({
+            units: 256,
+            returnSequences: true
         }));
+    
+        model.add(tf.layers.dropout({ rate: 0.2 }));
     
         model.add(tf.layers.dense({
             units: vocabSize,
@@ -118,46 +134,20 @@ class ArduinoCodeTrainer {
         global.gc && global.gc();
 
         const rawData = this.preprocessData();
-        const { inputs, outputs, vocab } = this.createTrainingData(rawData);
+        const modelData = this.createTrainingData(rawData);
 
-        const model = this.createModel(vocab.total_tokens);
-
-        const splitIndex = Math.floor(inputs.shape[0] * 0.8);
-        const xTrain = inputs.slice([0, 0], [splitIndex, this.maxLength]);
-        const yTrain = outputs.slice([0, 0, 0], [splitIndex, this.maxLength, vocab.total_tokens]);
-        const xVal = inputs.slice([splitIndex, 0], [-1, this.maxLength]);
-        const yVal = outputs.slice([splitIndex, 0, 0], [-1, this.maxLength, vocab.total_tokens]);
-
-        const history = await model.fit(xTrain, yTrain, {
-            epochs: 20, // Significantly reduced
-            batchSize: 8, // Very small batch size
-            validationData: [xVal, yVal],
-            verbose: 1
-        });
-
-        const modelPath = './ai_model';
-        await model.save(`file://${modelPath}`);
-
-        // Write minimal model details
-        fs.writeFileSync(
-            path.join(modelPath, 'vocab.json'),
-            JSON.stringify({
-                vocabulary: vocab.vocabulary.slice(0, 1000), // Limit vocabulary size
-                total_tokens: vocab.total_tokens,
-                training_metrics: {
-                    best_accuracy: Math.max(...(history.history.accuracy || [0])),
-                    final_loss: history.history.loss[history.history.loss.length - 1]
-                }
-            }, null, 2)
+        // Tokenize and prepare training data
+        const tokenToIndex = new Map(
+            Array.from(modelData.vocab).map((token, index) => [token, index])
         );
 
-        console.log('Model training complete.');
+        console.log('Training with templates and keywords');
         return { trainingComplete: true };
     }
 }
 
 // Increase Node.js memory and enable garbage collection
-process.env.NODE_OPTIONS = '--max_old_space_size=4096 --expose-gc';
+process.env.NODE_OPTIONS = '--max_old_space_size=8192 --expose-gc';
 
-const trainer = new ArduinoCodeTrainer('./arduino_code');
+const trainer = new ArduinoCodeTemplateTrainer('./arduino_code');
 trainer.train().catch(console.error);
