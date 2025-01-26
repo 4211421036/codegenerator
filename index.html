@@ -80,22 +80,25 @@
         }
     
         processInput(input) {
-            // Validate input before using it
+            // Ensure input is a valid string
             if (typeof input !== 'string') {
                 console.error("Invalid input: expected a string, but got:", typeof input);
                 return ""; // Return empty if input is not a valid string
             }
     
-            let processedInput = input.toLowerCase(); // Make input lowercase for consistency
+            // Normalize the input
+            let processedInput = input.toLowerCase();
             console.log("Processed input:", processedInput);
     
-            // Ensure the model contains templates with the expected structure
+            // Validate that keywords exist and are strings
             if (this.model.templates && Array.isArray(this.model.templates)) {
                 this.model.templates.forEach(template => {
                     if (template.keywords && Array.isArray(template.keywords)) {
                         template.keywords.forEach(keyword => {
+                            // Check if the keyword is a string and not undefined
                             if (typeof keyword === 'string') {
                                 console.log("Checking keyword:", keyword);
+                                // Check if the input contains the keyword
                                 if (processedInput.includes(keyword.toLowerCase())) {
                                     processedInput = processedInput.replace(keyword.toLowerCase(), template.name.toLowerCase());
                                 }
