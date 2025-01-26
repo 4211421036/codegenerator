@@ -47,19 +47,13 @@
     class AIArduinoCodeGenerator {
         constructor() {
             this.model = null;
-            this.vocab = null;
         }
 
         async loadModel() {
             try {
-                // Load model and vocabulary
-                const [modelResponse, vocabResponse] = await Promise.all([
-                    fetch('https://4211421036.github.io/codegenerator/ai_model/model.json'),
-                    fetch('https://4211421036.github.io/codegenerator/ai_model/vocab.json')
-                ]);
-                
+                // Load model.json
+                const modelResponse = await fetch('https://4211421036.github.io/codegenerator/ai_model/model.json');
                 this.model = await modelResponse.json();
-                this.vocab = await vocabResponse.json();
                 console.log("Model loaded successfully");
             } catch (error) {
                 console.error("Model loading failed:", error);
@@ -67,46 +61,61 @@
         }
 
         generateCode(input) {
-            // Check if model is loaded
-            if (!this.model || !this.vocab) {
+            if (!this.model) {
                 return "AI Model not loaded. Please try again.";
             }
 
-            // Generate code based on model's understanding of the user's input
-            const generatedCode = this.generateCodeFromModel(input);
+            // Analyze user input and generate code based on model
+            const matchedFunctions = this.matchFunctions(input);
+            const matchedKeywords = this.matchKeywords(input);
+            const matchedLibraries = this.matchLibraries(input);
+
+            // Build the code dynamically based on matches
+            const generatedCode = this.buildCode(matchedFunctions, matchedKeywords, matchedLibraries);
             return generatedCode;
         }
 
-        async generateCodeFromModel(input) {
-            // Input should be processed and transformed to suitable format to pass into model
-
-            // Here, let's simulate the AI response (in a real setup, model would generate code here)
-            const prompt = `Generate Arduino code for a project based on this description: ${input}`;
-
-            // Here, you would pass the 'prompt' to your trained model for inference
-            // Assume the model generates the Arduino code string in response
-            // For now, returning a simulated response
-
-            const response = await this.getModelResponse(prompt);
-
-            return response; // The model's generated Arduino code
+        matchFunctions(input) {
+            // Match functions from model based on user input (simplified for now)
+            const matched = this.model.filter(item => item.functions.some(func => input.includes(func.name)));
+            return matched.length > 0 ? matched[0].functions : [];
         }
 
-        async getModelResponse(prompt) {
-            // For now, simulate an AI-based code generation response (to be replaced with actual model inference)
-            return `// Generated Arduino Code for the project
-#include <Arduino.h>
+        matchKeywords(input) {
+            // Match keywords (simplified for now)
+            return this.model.reduce((acc, item) => acc.concat(item.keywords), []);
+        }
 
-void setup() {
-  Serial.begin(9600);
-  // Custom project setup
-}
+        matchLibraries(input) {
+            // Match libraries (simplified for now)
+            return this.model.reduce((acc, item) => acc.concat(item.libraries), []);
+        }
 
-void loop() {
-  // Custom project loop logic
-  Serial.println("Project Running!");
-  delay(1000);
-}`;
+        buildCode(functions, keywords, libraries) {
+            let code = "";
+
+            // Add libraries
+            libraries.forEach(lib => {
+                code += `#include <${lib}>\n`;
+            });
+
+            // Add setup and loop functions from the matched functions
+            functions.forEach(func => {
+                code += `\nvoid ${func.name}() {\n${func.body}\n}\n`;
+            });
+
+            // Add a simple loop function as a fallback if no matches
+            if (functions.length === 0) {
+                code += `\nvoid loop() {\n  // Your logic here\n}\n`;
+            }
+
+            // Add keywords logic (simplified)
+            code += "\n// Additional functionality:\n";
+            keywords.forEach(keyword => {
+                code += `  ${keyword};\n`;
+            });
+
+            return code;
         }
     }
 
