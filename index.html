@@ -65,55 +65,52 @@
                 return "AI Model not loaded. Please try again.";
             }
 
-            // Analyze user input and generate code based on model
+            // Dynamic matching of keywords, functions, and libraries
             const matchedFunctions = this.matchFunctions(input);
-            const matchedKeywords = this.matchKeywords(input);
             const matchedLibraries = this.matchLibraries(input);
 
             // Build the code dynamically based on matches
-            const generatedCode = this.buildCode(matchedFunctions, matchedKeywords, matchedLibraries);
+            const generatedCode = this.buildCode(matchedFunctions, matchedLibraries);
             return generatedCode;
         }
 
         matchFunctions(input) {
-            // Match functions from model based on user input (simplified for now)
-            const matched = this.model.filter(item => item.functions.some(func => input.includes(func.name)));
+            // Use the AI model to identify functions based on input (more dynamic)
+            const matched = this.model.filter(item => input.toLowerCase().includes(item.name.toLowerCase()));
             return matched.length > 0 ? matched[0].functions : [];
         }
 
-        matchKeywords(input) {
-            // Match keywords (simplified for now)
-            return this.model.reduce((acc, item) => acc.concat(item.keywords), []);
-        }
-
         matchLibraries(input) {
-            // Match libraries (simplified for now)
-            return this.model.reduce((acc, item) => acc.concat(item.libraries), []);
+            // Match libraries dynamically based on user input (using AI model logic)
+            let matchedLibraries = [];
+            this.model.forEach(item => {
+                // Check if the input mentions any of the keywords in the model
+                item.keywords.forEach(keyword => {
+                    if (input.toLowerCase().includes(keyword.toLowerCase())) {
+                        matchedLibraries = [...new Set([...matchedLibraries, ...item.libraries])];
+                    }
+                });
+            });
+            return matchedLibraries;
         }
 
-        buildCode(functions, keywords, libraries) {
+        buildCode(functions, libraries) {
             let code = "";
 
             // Add libraries
             libraries.forEach(lib => {
-                code += `#include <${lib}>\n`;
+                code += `#include <${lib}.h>\n`;
             });
 
-            // Add setup and loop functions from the matched functions
+            // Add setup and loop functions from matched functions
             functions.forEach(func => {
                 code += `\nvoid ${func.name}() {\n${func.body}\n}\n`;
             });
 
-            // Add a simple loop function as a fallback if no matches
+            // Add a simple loop function as fallback if no matches
             if (functions.length === 0) {
                 code += `\nvoid loop() {\n  // Your logic here\n}\n`;
             }
-
-            // Add keywords logic (simplified)
-            code += "\n// Additional functionality:\n";
-            keywords.forEach(keyword => {
-                code += `  ${keyword};\n`;
-            });
 
             return code;
         }
