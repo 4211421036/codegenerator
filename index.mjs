@@ -30,26 +30,17 @@ class TemplateExtractor {
 
     analyzeFile(content) {
         return {
-            pinConfigurations: this.extractPinConfigurations(content),
-            functions: this.extractFunctions(content),
+            name: this.extractTemplateName(content),
             keywords: this.extractKeywords(content),
             libraries: this.extractLibraries(content),
-            sensors: this.detectSensors(content),
-            globalVariables: this.extractGlobalVariables(content),
-            controlStructures: this.analyzeControlStructures(content),
+            functions: this.extractFunctions(content),
         };
     }
 
-    extractPinConfigurations(content) {
-        const pinConfigs = [];
-        const pinRegex = /pinMode\((\d+|\w+),\s*(OUTPUT|INPUT|INPUT_PULLUP)\)/g;
-        let match;
-
-        while ((match = pinRegex.exec(content)) !== null) {
-            pinConfigs.push({ pin: match[1], mode: match[2] });
-        }
-
-        return pinConfigs;
+    // Extract template name from the file content or filename
+    extractTemplateName(content) {
+        const match = /#define\s+(\w+)/.exec(content);
+        return match ? match[1] : 'Unnamed Template';
     }
 
     extractFunctions(content) {
@@ -60,7 +51,6 @@ class TemplateExtractor {
         while ((match = functionRegex.exec(content)) !== null) {
             functions.push({
                 name: match[1],
-                parameters: match[2].trim(),
                 body: match[3].trim()
             });
         }
@@ -92,68 +82,23 @@ class TemplateExtractor {
         return libraries;
     }
 
-    detectSensors(content) {
-        const sensors = ["temperature", "humidity", "light", "distance", "motion", "pressure"];
-        return sensors.filter(sensor => content.toLowerCase().includes(sensor));
-    }
-
-    extractGlobalVariables(content) {
-        const globalVars = [];
-        const globalVarRegex = /^(int|float|char|String|bool)\s+(\w+)\s*=\s*([^;]+);/gm;
-        let match;
-
-        while ((match = globalVarRegex.exec(content)) !== null) {
-            globalVars.push({ type: match[1], name: match[2], value: match[3] });
-        }
-
-        return globalVars;
-    }
-
-    analyzeControlStructures(content) {
-        const structures = [];
-        const controlRegex = /\b(if|for|while|switch|case)\b/g;
-        let match;
-
-        while ((match = controlRegex.exec(content)) !== null) {
-            structures.push(match[1]);
-        }
-
-        return structures;
-    }
-
     updateVocabulary(vocab, keywords) {
         keywords.forEach(keyword => vocab.add(keyword));
     }
 
-    // Add async here
+    // Save the templates and vocabulary as model.json
     async saveTemplates(templates, vocab) {
         const modelPath = './ai_model';
-        
-        // Create and train a model (simple example)
-        const model = tf.sequential();
-        model.add(tf.layers.dense({ units: 10, inputShape: [10] }));
-        model.add(tf.layers.dense({ units: 1, activation: 'sigmoid' }));
 
-        model.compile({ optimizer: 'adam', loss: 'binaryCrossentropy', metrics: ['accuracy'] });
-
-        // Dummy data for training (you will need to modify this for your case)
-        const xs = tf.tensor2d([[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]]);
-        const ys = tf.tensor2d([[1]]);
-
-        await model.fit(xs, ys, { epochs: 10 });
-
-        // Save the trained model
-        await model.save(`file://${modelPath}`);
-
-        const vocabPath = path.join(modelPath, 'vocab.json');
-        // Dynamically save the extracted templates to model.json
         const modelJson = {
             templates: templates,
             vocab: Array.from(vocab)
         };
 
-        // Save both model and vocabulary
+        // Save both templates and vocabulary
         fs.writeFileSync(path.join(modelPath, 'model.json'), JSON.stringify(modelJson, null, 2));
+
+        const vocabPath = path.join(modelPath, 'vocab.json');
         fs.writeFileSync(vocabPath, JSON.stringify(Array.from(vocab), null, 2));
 
         console.log('Templates and vocabulary saved.');
