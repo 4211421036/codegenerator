@@ -72,28 +72,19 @@
             background-color: #45a049;
         }
 
+        /* Styling for the generated code */
         #code-output {
-            white-space: pre-wrap;
+            display: block;
+            font-family: 'Courier New', monospace;
             background-color: #1e1e1e;
             color: #f5f5f5;
-            padding: 20px;
+            padding: 15px;
             border-radius: 10px;
             margin-top: 20px;
             min-height: 150px;
-            font-family: 'Courier New', monospace;
-            display: inline-block;
+            max-height: 400px;
+            overflow-y: auto;
             width: 100%;
-            max-width: 100%;
-            word-wrap: break-word;
-            overflow-wrap: break-word;
-            line-height: 1.5;
-            text-align: left;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .syntax-highlight {
-            color: #00ff00; /* Green for code */
         }
 
         .syntax-function {
@@ -106,6 +97,15 @@
 
         .syntax-comment {
             color: #888; /* Light gray for comments */
+        }
+
+        .syntax-variable {
+            color: #00ff00; /* Green for variables */
+        }
+
+        .line {
+            white-space: nowrap;
+            padding: 2px;
         }
 
         /* Typing Animation with caret color */
@@ -216,12 +216,35 @@
             return element.innerHTML;
         }
 
-        // Function to apply syntax highlighting
-        function highlightSyntax(code) {
-            return code.replace(/(\/\/.*)/g, "<span class='syntax-comment'>$1</span>")
-                .replace(/\b(int|void|if|else|for|while|switch|case|break|return|auto|include|Serial|Wire|Expander|Power|delay|millis)\b/g, "<span class='syntax-keyword'>$1</span>")
-                .replace(/\b(Serial|Wire|Expander|Power|delay)\b/g, "<span class='syntax-function'>$1</span>")
-                .replace(/([A-Za-z0-9_]+)\s*\(/g, "<span class='syntax-highlight'>$1</span> (");
+        // Function to create code lines with syntax highlighting
+        function createHighlightedCodeLine(line) {
+            const lineElement = document.createElement('div');
+            lineElement.classList.add('line');
+
+            const keywords = /(\b(int|void|if|else|for|while|switch|case|break|return|auto|include|Serial|Wire|Expander|Power|delay|millis)\b)/g;
+            const functions = /\b(Serial|Wire|Expander|Power|delay)\b/g;
+            const comments = /\/\/.*/g;
+            const variables = /([A-Za-z0-9_]+)/g;
+
+            line = line.replace(keywords, "<span class='syntax-keyword'>$1</span>")
+                .replace(functions, "<span class='syntax-function'>$1</span>")
+                .replace(comments, "<span class='syntax-comment'>$&</span>")
+                .replace(variables, "<span class='syntax-variable'>$1</span>");
+
+            lineElement.innerHTML = line;
+            return lineElement;
+        }
+
+        // Function to display the generated code with syntax highlighting
+        function displayGeneratedCode(generatedCode) {
+            const codeOutput = document.getElementById('code-output');
+            codeOutput.innerHTML = ''; // Clear any previous content
+
+            const codeLines = generatedCode.split('\n');
+            codeLines.forEach(line => {
+                const highlightedLine = createHighlightedCodeLine(line);
+                codeOutput.appendChild(highlightedLine);
+            });
         }
 
         // Event listener for the generate button (Desktop)
@@ -237,23 +260,8 @@
             const detectedKeywords = detectKeywords(description, modelData);
             const generatedCode = generateArduinoCode(detectedKeywords, modelData);
 
-            // Display the generated code in the output area with syntax highlighting and typing effect
-            const outputArea = document.getElementById('code-output');
-            outputArea.innerHTML = ''; // Clear previous content
-            const highlightedCode = highlightSyntax(generatedCode);
-
-            let index = 0;
-            const typingSpeed = 50;
-
-            function typeWriter() {
-                if (index < highlightedCode.length) {
-                    outputArea.innerHTML += highlightedCode.charAt(index); // Show highlighted code
-                    index++;
-                    setTimeout(typeWriter, typingSpeed);
-                }
-            }
-
-            typeWriter();
+            // Display the generated code with syntax highlighting
+            displayGeneratedCode(generatedCode);
         });
     </script>
 </body>
