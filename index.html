@@ -64,18 +64,9 @@
                 }
             });
 
-            // If no templates match, combine multiple templates
+            // If no templates match, return a message indicating no match
             if (code === "") {
-                modelData.templates.forEach(template => {
-                    code += `// ${template.name}\n`;
-
-                    // Add libraries to the list
-                    template.libraries.forEach(lib => libraries.add(lib));
-
-                    template.functions.forEach(func => {
-                        code += `\n${func.name}:\n${func.body}\n`;
-                    });
-                });
+                code = "// No matching templates found for the given description.\n";
             }
 
             // Include libraries at the beginning of the code
