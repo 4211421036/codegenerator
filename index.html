@@ -36,7 +36,7 @@
             
             modelData.templates.forEach(template => {
                 template.keywords.forEach(keyword => {
-                    if (descriptionLower.includes(keyword)) {
+                    if (descriptionLower.includes(keyword.toLowerCase())) {
                         detectedKeywords.push(keyword);
                     }
                 });
@@ -48,20 +48,46 @@
         // Function to generate Arduino code based on detected keywords
         function generateArduinoCode(keywords, modelData) {
             let code = "";
+            let libraries = new Set();
+            let usedTemplates = new Set();
+
             modelData.templates.forEach(template => {
                 // If template matches any detected keyword
                 if (keywords.some(keyword => template.keywords.includes(keyword))) {
+                    usedTemplates.add(template.name);
                     code += `// ${template.name}\n`;
-                    code += `void setup() {\n    ${template.functions.setup}\n}\n\n`;
-                    code += `void loop() {\n    ${template.functions.loop}\n}\n\n`;
+
+                    // Add libraries to the list, ensuring no duplicates
+                    template.libraries.forEach(lib => libraries.add(lib));
+
+                    template.functions.forEach(func => {
+                        code += `\n${func.name}:\n${func.body}\n`;
+                    });
                 }
             });
 
-            if (!code) {
-                code = "No matching templates found for the description.";
+            // If no templates match, combine multiple templates
+            if (usedTemplates.size === 0) {
+                modelData.templates.forEach(template => {
+                    code += `// ${template.name}\n`;
+
+                    // Add libraries to the list
+                    template.libraries.forEach(lib => libraries.add(lib));
+
+                    template.functions.forEach(func => {
+                        code += `\n${func.name}:\n${func.body}\n`;
+                    });
+                });
             }
 
-            return code;
+            // Include libraries at the beginning of the code
+            let librariesCode = "";
+            libraries.forEach(lib => {
+                librariesCode += `#include <${lib}>\n`;
+            });
+
+            // Combine libraries and code
+            return librariesCode + "\n" + code;
         }
 
         // Event listener for the generate button
