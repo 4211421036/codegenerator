@@ -3,188 +3,98 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Arduino Code Generator</title>
+    <title>Arduino Code Generator</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            background-color: #f4f4f9;
-            padding: 20px;
-        }
-        .container {
-            width: 100%;
-            max-width: 800px;
-            background-color: white;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        }
-        textarea, button, pre {
-            width: 100%;
-            margin: 10px 0;
-            padding: 10px;
-            box-sizing: border-box;
-        }
-        button {
-            background-color: #4caf50;
-            color: white;
-            border: none;
-            border-radius: 5px;
-        }
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        #code-output { white-space: pre-wrap; background-color: #f4f4f4; padding: 10px; border-radius: 5px; }
+        select, button { padding: 10px; margin: 10px 0; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>AI Arduino Code Generator</h1>
-        <textarea id="userInput" placeholder="Describe your Arduino project..."></textarea>
-        <button id="generateBtn">Generate Code</button>
-        <pre id="codeOutput"></pre>
-    </div>
+    <h1>Arduino Code Generator</h1>
+    
+    <label for="template-select">Choose a Template:</label>
+    <select id="template-select">
+        <option value="">Select Template</option>
+    </select>
+
+    <button id="generate-btn">Generate Arduino Code</button>
+
+    <h2>Generated Code:</h2>
+    <div id="code-output"></div>
 
     <script>
-    class AIArduinoCodeGenerator {
-        constructor() {
-            this.model = null;
-        }
-    
-        async loadModel() {
+        // Load model.json and vocab.json from server
+        async function loadModel() {
             try {
-                const modelResponse = await fetch('https://4211421036.github.io/codegenerator/ai_model/model.json');
-                this.model = await modelResponse.json();
-                console.log("Model loaded successfully:", this.model);
+                const response = await fetch('model.json');
+                const modelData = await response.json();
+
+                // Populate template options based on loaded model data
+                const templateSelect = document.getElementById('template-select');
+                modelData.templates.forEach(template => {
+                    const option = document.createElement('option');
+                    option.value = template.name;
+                    option.textContent = template.name;
+                    templateSelect.appendChild(option);
+                });
+
             } catch (error) {
-                console.error("Model loading failed:", error);
+                console.error('Error loading model.json:', error);
             }
         }
-    
-        async generateCode(input) {
-            if (!this.model) {
-                console.error("AI Model not loaded. Please try again.");
-                return "AI Model not loaded. Please try again.";
-            }
-    
-            // Ensure that the model has the expected structure
-            if (!this.model.templates || !Array.isArray(this.model.templates)) {
-                console.error("Model structure is incorrect. Templates are missing or not in the correct format.");
-                return "Model structure is incorrect.";
-            }
-    
-            // Process input and generate the code
-            const processedInput = this.processInput(input);
-    
-            // Build the code dynamically based on the processed input
-            const code = this.buildCodeFromInput(processedInput);
-            return code;
-        }
-    
-        processInput(input) {
-            if (typeof input !== 'string') {
-                console.error("Invalid input: expected a string, but got:", typeof input);
-                return ""; 
-            }
-    
-            let processedInput = input.toLowerCase();
-            console.log("Processed input:", processedInput);
-    
-            if (this.model.templates && Array.isArray(this.model.templates)) {
-                this.model.templates.forEach(template => {
-                    if (template.keywords && Array.isArray(template.keywords)) {
-                        template.keywords.forEach(keyword => {
-                            if (typeof keyword === 'string' && keyword.trim() !== '') {
-                                console.log("Checking keyword:", keyword);
-                                if (processedInput.includes(keyword.toLowerCase())) {
-                                    processedInput = processedInput.replace(new RegExp(keyword, 'gi'), template.name.toLowerCase());
-                                }
-                            } else {
-                                console.error("Invalid keyword type. Expected string, got:", typeof keyword);
+
+        // Generate Arduino code based on selected template
+        function generateArduinoCode(templateName) {
+            const templateSelect = document.getElementById('template-select');
+            const selectedTemplate = templateSelect.value;
+
+            // Find the selected template from the loaded model data
+            fetch('model.json')
+                .then(response => response.json())
+                .then(modelData => {
+                    const template = modelData.templates.find(t => t.name === selectedTemplate);
+
+                    if (template) {
+                        let code = '';
+
+                        // Generate setup and loop functions
+                        code += `void setup() {\n`;
+                        template.functions.forEach(func => {
+                            if (func.name === 'setup') {
+                                code += `    ${func.body}\n`;
                             }
                         });
-                    } else {
-                        console.error("Template has no keywords or keywords is not an array:", template);
-                    }
-                });
-            } else {
-                console.error("Model has no templates or templates is not an array");
-            }
-    
-            return processedInput;
-        }
-    
-        buildCodeFromInput(input) {
-            let code = "";
-            let usedLibraries = new Set();
-    
-            // Ensure the model contains templates with expected structure
-            if (this.model.templates && Array.isArray(this.model.templates)) {
-                let matchedTemplateFound = false;
-    
-                this.model.templates.forEach(template => {
-                    if (input.includes(template.name.toLowerCase())) {
-                        matchedTemplateFound = true;
-                        // Add libraries for this template
-                        if (template.libraries && Array.isArray(template.libraries)) {
-                            template.libraries.forEach(lib => {
-                                if (typeof lib === 'string' && !usedLibraries.has(lib)) {
-                                    code += `#include <${lib}.h>\n`;
-                                    usedLibraries.add(lib);
-                                }
-                            });
-                        }
-    
-                        // Add functions related to the matched template
-                        if (template.functions && Array.isArray(template.functions)) {
-                            template.functions.forEach(func => {
-                                if (func.name && func.body) {
-                                    code += `\nvoid ${func.name}() {\n  ${func.body}\n}\n`;
-                                } else {
-                                    console.error("Invalid function format: missing name or body");
-                                }
-                            });
-                        } else {
-                            console.error("Template functions are missing or not an array");
-                        }
-                    }
-                });
-    
-                // If no matching template is found, show a default message
-                if (!matchedTemplateFound) {
-                    code = `// No template matched your input. Please check your input and try again.`;
-                }
-    
-            } else {
-                console.error("Model has no templates or templates is not an array");
-            }
-    
-            // Add loop function if no matches were found
-            if (code.length === 0) {
-                code += `\nvoid loop() {\n  // Your logic here\n}\n`;
-            }
-    
-            return code;
-        }
-    }
-    
-    // Initialize the generator
-    const generator = new AIArduinoCodeGenerator();
-    
-    // Wait for the model to load before generating code
-    document.getElementById('generateBtn').addEventListener('click', async () => {
-        const input = document.getElementById('userInput').value;
-        const outputElement = document.getElementById('codeOutput');
-    
-        if (!generator.model) {
-            await generator.loadModel();
-        }
-    
-        const code = await generator.generateCode(input);
-        outputElement.textContent = code;
-    });
-    
-    // Preload model on page load
-    generator.loadModel();
-    </script>
+                        code += `}\n\n`;
 
+                        code += `void loop() {\n`;
+                        template.functions.forEach(func => {
+                            if (func.name === 'loop') {
+                                code += `    ${func.body}\n`;
+                            }
+                        });
+                        code += `}\n`;
+
+                        // Display generated code in the output div
+                        document.getElementById('code-output').textContent = code;
+                    }
+                })
+                .catch(error => console.error('Error generating code:', error));
+        }
+
+        // Initialize the page
+        window.onload = () => {
+            loadModel();
+
+            document.getElementById('generate-btn').addEventListener('click', () => {
+                const selectedTemplate = document.getElementById('template-select').value;
+                if (selectedTemplate) {
+                    generateArduinoCode(selectedTemplate);
+                } else {
+                    alert('Please select a template.');
+                }
+            });
+        };
+    </script>
 </body>
 </html>
