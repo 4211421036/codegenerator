@@ -3,17 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Arduino Code Generator</title>
+    <title>AI Arduino Code Generator</title>
     <style>
         body {
             font-family: Arial, sans-serif;
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
-            height: 100vh;
             background-color: #f4f4f9;
-            margin: 0;
             padding: 20px;
         }
         .container {
@@ -24,187 +21,193 @@
             border-radius: 10px;
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         }
-        h1 {
-            color: #4caf50;
-            text-align: center;
-        }
         textarea, button, pre {
+            width: 100%;
             margin: 10px 0;
             padding: 10px;
-            font-size: 16px;
-            width: 100%;
             box-sizing: border-box;
-        }
-        textarea {
-            height: 100px;
-            resize: vertical;
         }
         button {
             background-color: #4caf50;
             color: white;
             border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: background-color 0.3s;
-        }
-        button:hover {
-            background-color: #45a049;
-        }
-        pre {
-            background-color: #222;
-            color: white;
-            overflow-x: auto;
-            border-radius: 8px;
-            max-height: 400px;
-            overflow-y: auto;
-            white-space: pre-wrap;
-        }
-        .thinking {
-            font-style: italic;
-            color: #777;
+            border-radius: 5px;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Arduino Code Generator</h1>
+        <h1>AI Arduino Code Generator</h1>
         <textarea id="userInput" placeholder="Describe your Arduino project..."></textarea>
-        <button id="generateButton">Generate Code</button>
-        <pre id="outputCode">Arduino code will appear here...</pre>
-        <p id="thinkingText" class="thinking"></p>
+        <button id="generateBtn">Generate Code</button>
+        <pre id="codeOutput"></pre>
     </div>
 
     <script>
-        class ArduinoCodeGenerator {
-            constructor() {
-                this.model = null;
-                this.vocab = null;
-            }
+    class AIArduinoCodeGenerator {
+        constructor() {
+            this.model = null;
+            this.vocab = null;
+        }
 
-            async loadModelAndVocab() {
-                try {
-                    const [modelResponse, vocabResponse] = await Promise.all([
-                        fetch('https://4211421036.github.io/codegenerator/ai_model/model.json'),
-                        fetch('https://4211421036.github.io/codegenerator/ai_model/vocab.json')
-                    ]);
-                    
-                    this.model = await modelResponse.json();
-                    this.vocab = await vocabResponse.json();
-                    console.log("Model and Vocab successfully loaded.");
-                } catch (error) {
-                    console.error("Failed to load model or vocab:", error);
-                }
+        async loadModel() {
+            try {
+                const [modelResponse, vocabResponse] = await Promise.all([
+                    fetch('https://4211421036.github.io/codegenerator/ai_model/model.json'),
+                    fetch('https://4211421036.github.io/codegenerator/ai_model/vocab.json')
+                ]);
+                
+                this.model = await modelResponse.json();
+                this.vocab = await vocabResponse.json();
+                console.log("Model loaded successfully");
+            } catch (error) {
+                console.error("Model loading failed:", error);
             }
+        }
 
-            generateBaseTemplate() {
-                return `void setup() {
+        generateCodeTemplate(projectType) {
+            // More dynamic template generation based on project type
+            const templates = {
+                'sensor': this.generateSensorTemplate(),
+                'motor': this.generateMotorTemplate(),
+                'led': this.generateLEDTemplate(),
+                'default': this.generateDefaultTemplate()
+            };
+
+            return templates[projectType] || templates['default'];
+        }
+
+        generateSensorTemplate() {
+            return `// Sensor Project
+#include <Sensor.h>
+
+Sensor sensorModule;
+
+void setup() {
   Serial.begin(9600);
-  // Add pin configurations here
+  sensorModule.init();
 }
 
 void loop() {
-  // Add your main code logic here
+  float sensorValue = sensorModule.readValue();
+  Serial.print("Sensor Reading: ");
+  Serial.println(sensorValue);
+  delay(1000);
 }`;
-            }
-
-            generateCodeFromInput(input) {
-                // Basic AI-assisted code generation logic
-                if (!this.model || !this.vocab) {
-                    return "Model or vocabulary not loaded.";
-                }
-
-                let generatedCode = this.generateBaseTemplate();
-
-                // Augment base template based on input and model
-                const keywords = this.extractKeywords(input);
-                
-                keywords.forEach(keyword => {
-                    if (this.model.pinConfigurations && this.model.pinConfigurations[keyword]) {
-                        generatedCode = this.updatePinConfiguration(generatedCode, keyword);
-                    }
-                    
-                    if (this.model.functionTemplates && this.model.functionTemplates[keyword]) {
-                        generatedCode = this.addFunctionTemplate(generatedCode, keyword);
-                    }
-                });
-
-                return generatedCode;
-            }
-
-            extractKeywords(input) {
-                const commonArduinoKeywords = [
-                    'led', 'sensor', 'motor', 'button', 'relay', 
-                    'temperature', 'humidity', 'light', 'sound'
-                ];
-                
-                return commonArduinoKeywords.filter(keyword => 
-                    input.toLowerCase().includes(keyword)
-                );
-            }
-
-            updatePinConfiguration(code, keyword) {
-                const pinConfig = this.model.pinConfigurations[keyword];
-                const setupRegex = /(Serial\.begin\(9600\);)\n/;
-                return code.replace(setupRegex, `$1\n  pinMode(${pinConfig.pin}, ${pinConfig.mode});\n`);
-            }
-
-            addFunctionTemplate(code, keyword) {
-                const functionTemplate = this.model.functionTemplates[keyword];
-                const loopRegex = /void loop\(\) {\n\s*\/\/ Add your main code logic here\n}/;
-                return code.replace(loopRegex, `void loop() {\n  ${functionTemplate}\n}`);
-            }
         }
 
-        const codeGenerator = new ArduinoCodeGenerator();
+        generateMotorTemplate() {
+            return `// Motor Control Project
+#include <Motor.h>
 
-        async function generateCode() {
-            const inputText = document.getElementById('userInput').value;
-            const outputField = document.getElementById('outputCode');
-            const thinkingText = document.getElementById('thinkingText');
+Motor motorControl;
 
-            if (!inputText) {
-                alert("Please enter a project description.");
-                return;
-            }
+void setup() {
+  motorControl.begin();
+  motorControl.setSpeed(100);
+}
 
-            try {
-                if (!codeGenerator.model) {
-                    await codeGenerator.loadModelAndVocab();
-                }
-
-                // Simulate thinking animation
-                thinkingText.textContent = "Thinking... Please wait...";
-                outputField.textContent = ""; // Clear previous output
-
-                // Simulate typing animation
-                setTimeout(async () => {
-                    const arduinoCode = codeGenerator.generateCodeFromInput(inputText);
-                    outputField.textContent = "";
-                    let i = 0;
-                    const typingSpeed = 50; // milliseconds between typing each character
-
-                    function typeCharacter() {
-                        if (i < arduinoCode.length) {
-                            outputField.textContent += arduinoCode.charAt(i);
-                            i++;
-                            setTimeout(typeCharacter, typingSpeed);
-                        } else {
-                            thinkingText.textContent = ""; // Clear thinking text after completion
-                        }
-                    }
-
-                    typeCharacter(); // Start the typing animation
-                }, 1500); // Simulate the thinking delay before typing starts
-
-            } catch (error) {
-                console.error("Error generating code:", error);
-                outputField.textContent = "An error occurred while generating code.";
-                thinkingText.textContent = "";
-            }
+void loop() {
+  motorControl.forward();
+  delay(1000);
+  motorControl.stop();
+  delay(500);
+  motorControl.reverse();
+  delay(1000);
+}`;
         }
 
-        document.getElementById('generateButton').addEventListener('click', generateCode);
-        codeGenerator.loadModelAndVocab();
+        generateLEDTemplate() {
+            return `// LED Control Project
+const int ledPin = 13;
+
+void setup() {
+  pinMode(ledPin, OUTPUT);
+}
+
+void loop() {
+  digitalWrite(ledPin, HIGH);
+  delay(500);
+  digitalWrite(ledPin, LOW);
+  delay(500);
+}`;
+        }
+
+        generateDefaultTemplate() {
+            return `void setup() {
+  Serial.begin(9600);
+  // Initialize your project components
+}
+
+void loop() {
+  // Your main project logic
+  // Add your specific implementation here
+}`;
+        }
+
+        determineProjectType(input) {
+            const projectTypes = {
+                'sensor': ['temperature', 'humidity', 'pressure', 'light'],
+                'motor': ['motor', 'servo', 'stepper'],
+                'led': ['led', 'light', 'blink']
+            };
+
+            for (const [type, keywords] of Object.entries(projectTypes)) {
+                if (keywords.some(keyword => input.toLowerCase().includes(keyword))) {
+                    return type;
+                }
+            }
+
+            return 'default';
+        }
+
+        enhanceCode(baseCode, input) {
+            // Additional code enhancement logic
+            const enhancements = {
+                'serial': () => baseCode.replace('Serial.begin(9600);', 
+                    'Serial.begin(9600);\n  Serial.println("Project initialized");'),
+                'delay': () => baseCode.replace('delay(500);', 
+                    'delay(map(analogRead(A0), 0, 1023, 100, 1000));')
+            };
+
+            Object.values(enhancements).forEach(enhancement => {
+                baseCode = enhancement();
+            });
+
+            return baseCode;
+        }
+
+        generateCode(input) {
+            if (!this.model || !this.vocab) {
+                return "AI Model not loaded. Please try again.";
+            }
+
+            const projectType = this.determineProjectType(input);
+            let generatedCode = this.generateCodeTemplate(projectType);
+            
+            // Enhance code based on input
+            generatedCode = this.enhanceCode(generatedCode, input);
+
+            return generatedCode;
+        }
+    }
+
+    const generator = new AIArduinoCodeGenerator();
+    
+    document.getElementById('generateBtn').addEventListener('click', async () => {
+        const input = document.getElementById('userInput').value;
+        const outputElement = document.getElementById('codeOutput');
+        
+        if (!generator.model) {
+            await generator.loadModel();
+        }
+
+        const code = generator.generateCode(input);
+        outputElement.textContent = code;
+    });
+
+    // Preload model
+    generator.loadModel();
     </script>
 </body>
 </html>
