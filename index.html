@@ -24,7 +24,7 @@
     <script>
         // Function to fetch model data from model.json
         async function loadModelData() {
-            const response = await fetch('model.json');
+            const response = await fetch('https://4211421036.github.io/codegenerator/ai_model/model.json');
             const modelData = await response.json();
             return modelData;
         }
