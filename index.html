@@ -78,15 +78,20 @@
         }
     
         processInput(input) {
-            // Process the input and make it more structured for generating code
+            // Validate input before using it
+            if (typeof input !== 'string') {
+                console.error("Invalid input: expected a string");
+                return "";
+            }
+    
             let processedInput = input.toLowerCase(); // Make input lowercase for consistency
     
             // Ensure the model contains templates with the expected keywords
             if (this.model.templates) {
                 this.model.templates.forEach(template => {
-                    if (template.keywords) {
+                    if (template.keywords && Array.isArray(template.keywords)) {
                         template.keywords.forEach(keyword => {
-                            if (processedInput.includes(keyword.toLowerCase())) {
+                            if (typeof keyword === 'string' && processedInput.includes(keyword.toLowerCase())) {
                                 processedInput = processedInput.replace(keyword.toLowerCase(), template.name.toLowerCase());
                             }
                         });
@@ -101,14 +106,14 @@
             let code = "";
             let usedLibraries = new Set();
     
-            // Iterate over the templates and generate code based on the processed input
+            // Ensure the model contains templates with expected structure
             if (this.model.templates) {
                 this.model.templates.forEach(template => {
                     if (input.includes(template.name.toLowerCase())) {
                         // Add libraries for this template
-                        if (template.libraries) {
+                        if (template.libraries && Array.isArray(template.libraries)) {
                             template.libraries.forEach(lib => {
-                                if (!usedLibraries.has(lib)) {
+                                if (typeof lib === 'string' && !usedLibraries.has(lib)) {
                                     code += `#include <${lib}.h>\n`;
                                     usedLibraries.add(lib);
                                 }
@@ -116,9 +121,11 @@
                         }
     
                         // Add functions related to the matched template
-                        if (template.functions) {
+                        if (template.functions && Array.isArray(template.functions)) {
                             template.functions.forEach(func => {
-                                code += `\nvoid ${func.name}() {\n  ${func.body}\n}\n`;
+                                if (func.name && func.body) {
+                                    code += `\nvoid ${func.name}() {\n  ${func.body}\n}\n`;
+                                }
                             });
                         }
                     }
