@@ -6,7 +6,7 @@ class ArduinoCodeTrainer {
     constructor(folderPath) {
         this.folderPath = folderPath;
         this.maxLength = 200;
-        this.maxFiles = 10000;
+        this.maxFiles = 1000;
     }
 
     preprocessData() {
