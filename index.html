@@ -101,13 +101,22 @@
             color: #ff6600; /* Orange for functions */
         }
 
+        .syntax-keyword {
+            color: #0000ff; /* Blue for keywords */
+        }
+
+        .syntax-comment {
+            color: #888; /* Light gray for comments */
+        }
+
         /* Typing Animation with caret color */
-        .typing {
+        .typing-text {
+            display: inline-block;
             border-right: 3px solid transparent;
             animation: typing 2s steps(30) 1s forwards, blink 0.75s step-end infinite;
             white-space: nowrap;
             overflow: hidden;
-            display: inline-block;
+            font-family: 'Courier New', monospace;
         }
 
         @keyframes typing {
@@ -166,34 +175,23 @@
             }
         }
 
-        /* Mobile-specific adjustments */
+        /* Hide mobile input on desktop and vice versa */
         .mobile-input {
-            position: fixed;
-            bottom: 0;
-            width: 100%;
-            background-color: white;
-            border-radius: 10px;
-            box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
-            padding: 10px 20px;
+            display: none;
         }
 
-        .mobile-input textarea {
-            width: calc(100% - 40px);
-            height: 60px;
-            border-radius: 10px;
-            padding: 10px;
-            font-size: 1rem;
-            border: 1px solid #ddd;
-        }
-
-        .mobile-input button {
-            width: 100%;
-            font-size: 1.1rem;
+        @media (max-width: 768px) {
+            .desktop-input {
+                display: none;
+            }
+            .mobile-input {
+                display: block;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="container">
+    <div class="container desktop-input">
         <h1>Arduino Code Generator</h1>
 
         <label for="description">Enter Project Description:</label>
@@ -202,7 +200,7 @@
         <button id="generate-btn">Generate Arduino Code</button>
 
         <h2>Generated Code:</h2>
-        <div id="code-output" class="typing"></div>
+        <div id="code-output"></div>
     </div>
 
     <div class="mobile-input">
@@ -283,7 +281,7 @@
 
             // Display the generated code in the output area with typing effect
             const outputArea = document.getElementById('code-output');
-            outputArea.textContent = ''; // Clear previous content
+            outputArea.innerHTML = ''; // Clear previous content
             let index = 0;
             const typingSpeed = 50;
 
@@ -306,18 +304,20 @@
                 return;
             }
 
+            // Load model data and generate Arduino code (Mobile version)
             const modelData = await loadModelData();
             const detectedKeywords = detectKeywords(description, modelData);
             const generatedCode = generateArduinoCode(detectedKeywords, modelData);
 
+            // Display the generated code in the output area with typing effect
             const outputArea = document.getElementById('code-output');
-            outputArea.textContent = ''; // Clear previous content
+            outputArea.innerHTML = ''; // Clear previous content
             let index = 0;
             const typingSpeed = 50;
 
             function typeWriter() {
                 if (index < generatedCode.length) {
-                    outputArea.innerHTML += generatedCode.charAt(index);
+                    outputArea.innerHTML += generatedCode.charAt(index); // Use innerHTML for formatting
                     index++;
                     setTimeout(typeWriter, typingSpeed);
                 }
