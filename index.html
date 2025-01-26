@@ -28,6 +28,7 @@
             border-radius: 10px;
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
             position: relative;
+            text-align: left; /* Align text left inside the container */
         }
 
         h1 {
@@ -85,6 +86,8 @@
             max-height: 400px;
             overflow-y: auto;
             width: 100%;
+            white-space: pre-wrap; /* Ensure wrapping of code lines */
+            word-wrap: break-word; /* Ensure long lines break appropriately */
         }
 
         .syntax-function {
