@@ -22,83 +22,79 @@
     <div id="code-output"></div>
 
     <script>
-        // Function to fetch model data from model.json
-        async function loadModelData() {
-            const response = await fetch('https://4211421036.github.io/codegenerator/ai_model/model.json');
-            const modelData = await response.json();
-            return modelData;
-        }
-
-        // Function to detect keywords in the user input description
-        function detectKeywords(description, modelData) {
-            const detectedKeywords = [];
-            const descriptionLower = description.toLowerCase();
-            
-            modelData.templates.forEach(template => {
-                template.keywords.forEach(keyword => {
-                    if (descriptionLower.includes(keyword.toLowerCase())) {
-                        detectedKeywords.push(keyword);
-                    }
-                });
-            });
-
-            return [...new Set(detectedKeywords)]; // Remove duplicates
-        }
-
-        // Function to generate Arduino code based on detected keywords
-        function generateArduinoCode(keywords, modelData) {
-            let code = "";
-            let libraries = new Set();
-
-            modelData.templates.forEach(template => {
-                // If template matches any detected keyword
-                if (keywords.some(keyword => template.keywords.includes(keyword))) {
-                    code += `// ${template.name}\n`;
-
-                    // Add libraries to the list, ensuring no duplicates
-                    template.libraries.forEach(lib => libraries.add(lib));
-
-                    template.functions.forEach(func => {
-                        code += `\n${func.name}:\n${func.body}\n`;
-                    });
-                }
-            });
-
-            // If no templates match, return a message indicating no match
-            if (code === "") {
-                code = "// No matching templates found for the given description.\n";
-            }
-
-            // Include libraries at the beginning of the code
-            let librariesCode = "";
-            libraries.forEach(lib => {
-                librariesCode += `#include <${lib}>\n`;
-            });
-
-            // Combine libraries and code
-            return librariesCode + "\n" + code;
-        }
-
-        // Event listener for the generate button
-        document.getElementById('generate-btn').addEventListener('click', async () => {
-            const description = document.getElementById('description').value;
-            if (!description) {
-                alert("Please enter a project description.");
-                return;
-            }
-
-            // Load model data from model.json
-            const modelData = await loadModelData();
-
-            // Detect keywords from the description
-            const detectedKeywords = detectKeywords(description, modelData);
-
-            // Generate the Arduino code based on detected keywords
-            const generatedCode = generateArduinoCode(detectedKeywords, modelData);
-
-            // Display the generated code
-            document.getElementById('code-output').textContent = generatedCode;
+    // Function to load model data from model.json
+    async function loadModelData() {
+      const response = await fetch('https://4211421036.github.io/codegenerator/ai_model/model.json');
+      const modelData = await response.json();
+      return modelData;
+    }
+    
+    // Function to detect keywords in user input (project description)
+    function detectKeywords(description, modelData) {
+      const detectedKeywords = [];
+      const descriptionLower = description.toLowerCase();
+      
+      modelData.templates.forEach(template => {
+        template.keywords.forEach(keyword => {
+          if (descriptionLower.includes(keyword.toLowerCase())) {
+            detectedKeywords.push(keyword);
+          }
         });
+      });
+    
+      return [...new Set(detectedKeywords)]; // Remove duplicates
+    }
+    
+    // Function to generate Arduino code based on detected keywords
+    function generateArduinoCode(keywords, modelData) {
+      let code = "";
+      let libraries = new Set();
+    
+      modelData.templates.forEach(template => {
+        if (keywords.some(keyword => template.keywords.includes(keyword))) {
+          code += `// ${template.name}\n\n`;
+    
+          // Add libraries to the list
+          template.libraries.forEach(lib => libraries.add(lib));
+    
+          // Generate setup and loop functions
+          template.functions.forEach(func => {
+            code += `void ${func.name}() {\n  ${func.body}\n}\n\n`;
+          });
+        }
+      });
+    
+      // If no template matches, return a message
+      if (code === "") {
+        code = "// No matching templates found for the given description.\n";
+      }
+    
+      // Include libraries at the top of the generated code
+      let librariesCode = "";
+      libraries.forEach(lib => {
+        librariesCode += `#include <${lib}>\n`;
+      });
+    
+      return librariesCode + "\n" + code;
+    }
+    
+    // Event listener for the generate button
+    document.getElementById('generate-btn').addEventListener('click', async () => {
+      const description = document.getElementById('description').value;
+      if (!description) {
+        alert("Please enter a project description.");
+        return;
+      }
+    
+      // Load model data and generate Arduino code
+      const modelData = await loadModelData();
+      const detectedKeywords = detectKeywords(description, modelData);
+      const generatedCode = generateArduinoCode(detectedKeywords, modelData);
+    
+      // Display the generated code in the output area
+      document.getElementById('code-output').textContent = generatedCode;
+    });
+
     </script>
 </body>
 </html>
