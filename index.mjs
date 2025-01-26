@@ -2,152 +2,140 @@ import * as tf from '@tensorflow/tfjs-node';
 import fs from 'fs';
 import path from 'path';
 
-class ArduinoCodeTemplateTrainer {
-    constructor(folderPath) {
+class TemplateExtractor {
+    constructor(folderPath, maxFiles = 500, maxLength = 500) {
         this.folderPath = folderPath;
-        this.maxLength = 200; // Increased to capture more code context
-        this.maxFiles = 500;  // Increased to process more files
+        this.maxFiles = maxFiles;
+        this.maxLength = maxLength;
     }
 
-    preprocessData() {
+    extractTemplates() {
         const files = fs.readdirSync(this.folderPath)
             .filter(file => file.endsWith('.ino'))
             .slice(0, this.maxFiles);
 
-        return files.map(file => {
+        const templates = [];
+        const vocab = new Set();
+
+        files.forEach(file => {
             const content = fs.readFileSync(path.join(this.folderPath, file), 'utf8');
-            return {
-                filename: file,
-                template: this.extractCodeTemplate(content),
-                keywords: this.extractKeywords(content),
-                fullContent: content
-            };
+            const fileTemplate = this.analyzeFile(content);
+
+            templates.push(fileTemplate);
+            this.updateVocabulary(vocab, fileTemplate.keywords);
         });
+
+        this.saveTemplates(templates, vocab);
     }
 
-    extractCodeTemplate(code) {
-        // Extract structural template of the code
-        const templatePatterns = [
-            /void\s+setup\s*\(\)\s*{[^}]*}/,
-            /void\s+loop\s*\(\)\s*{[^}]*}/,
-            /\w+\s+\w+\s*\([^)]*\)\s*{[^}]*}/
-        ];
-
-        const templateMatches = templatePatterns.map(pattern => 
-            (code.match(pattern) || [])[0] || ''
-        );
-
-        return templateMatches.join('\n');
+    analyzeFile(content) {
+        return {
+            pinConfigurations: this.extractPinConfigurations(content),
+            functions: this.extractFunctions(content),
+            keywords: this.extractKeywords(content),
+            libraries: this.extractLibraries(content),
+            sensors: this.detectSensors(content),
+            globalVariables: this.extractGlobalVariables(content),
+            controlStructures: this.analyzeControlStructures(content),
+        };
     }
 
-    extractKeywords(code) {
-        // Extract meaningful keywords and identifiers
+    extractPinConfigurations(content) {
+        const pinConfigs = [];
+        const pinRegex = /pinMode\((\d+|\w+),\s*(OUTPUT|INPUT|INPUT_PULLUP)\)/g;
+        let match;
+
+        while ((match = pinRegex.exec(content)) !== null) {
+            pinConfigs.push({ pin: match[1], mode: match[2] });
+        }
+
+        return pinConfigs;
+    }
+
+    extractFunctions(content) {
+        const functions = [];
+        const functionRegex = /void\s+(\w+)\((.*?)\)\s*{([\s\S]*?)}/g;
+        let match;
+
+        while ((match = functionRegex.exec(content)) !== null) {
+            functions.push({
+                name: match[1],
+                parameters: match[2].trim(),
+                body: match[3].trim()
+            });
+        }
+
+        return functions;
+    }
+
+    extractKeywords(content) {
+        const keywordRegex = /\b(digitalWrite|analogRead|analogWrite|delay|Serial|attachInterrupt|EEPROM|Wire)\b/g;
         const keywords = new Set();
-        const keywordPatterns = [
-            /\b(pinMode|digitalWrite|digitalRead|analogRead|delay)\b/g,
-            /\b(class|struct|enum)\s+(\w+)/g,
-            /\b(int|float|double|char|bool|void)\s+(\w+)\s*\(/g
-        ];
+        let match;
 
-        keywordPatterns.forEach(pattern => {
-            const matches = code.matchAll(pattern);
-            for (const match of matches) {
-                keywords.add(match[1] || match[2]);
-            }
-        });
+        while ((match = keywordRegex.exec(content)) !== null) {
+            keywords.add(match[1]);
+        }
 
         return Array.from(keywords);
     }
 
-    createTrainingData(data) {
-        // Create comprehensive training data with templates and keywords
-        const modelData = {
-            templates: [],
-            keywords: [],
-            vocab: new Set(['<PAD>', '<START>', '<END>'])
-        };
+    extractLibraries(content) {
+        const libraries = [];
+        const libraryRegex = /#include\s+<([^>]+)>/g;
+        let match;
 
-        data.forEach(item => {
-            // Collect templates
-            if (item.template) {
-                modelData.templates.push({
-                    filename: item.filename,
-                    template: item.template
-                });
-            }
+        while ((match = libraryRegex.exec(content)) !== null) {
+            libraries.push(match[1]);
+        }
 
-            // Collect keywords
-            item.keywords.forEach(keyword => {
-                modelData.keywords.push(keyword);
-                modelData.vocab.add(keyword);
-            });
-        });
-
-        // Write model.json with templates
-        fs.writeFileSync('model.json', JSON.stringify({
-            templates: modelData.templates,
-            total_templates: modelData.templates.length
-        }, null, 2));
-
-        // Write vocab.json with keywords
-        fs.writeFileSync('vocab.json', JSON.stringify({
-            keywords: Array.from(modelData.keywords),
-            total_keywords: modelData.keywords.length,
-            vocabulary: Array.from(modelData.vocab)
-        }, null, 2));
-
-        return modelData;
+        return libraries;
     }
 
-    createModel(vocabSize) {
-        const model = tf.sequential();
-    
-        model.add(tf.layers.embedding({
-            inputDim: vocabSize,
-            outputDim: 128,
-            inputLength: this.maxLength
-        }));
-    
-        model.add(tf.layers.lstm({
-            units: 256,
-            returnSequences: true
-        }));
-    
-        model.add(tf.layers.dropout({ rate: 0.2 }));
-    
-        model.add(tf.layers.dense({
-            units: vocabSize,
-            activation: 'softmax'
-        }));
-    
-        model.compile({
-            loss: 'categoricalCrossentropy',
-            optimizer: 'adam',
-            metrics: ['accuracy']
-        });
-    
-        return model;
+    detectSensors(content) {
+        const sensors = ["temperature", "humidity", "light", "distance", "motion", "pressure"];
+        return sensors.filter(sensor => content.toLowerCase().includes(sensor));
     }
 
-    async train() {
-        // Explicitly free memory before training
-        global.gc && global.gc();
+    extractGlobalVariables(content) {
+        const globalVars = [];
+        const globalVarRegex = /^(int|float|char|String|bool)\s+(\w+)\s*=\s*([^;]+);/gm;
+        let match;
 
-        const rawData = this.preprocessData();
-        const modelData = this.createTrainingData(rawData);
+        while ((match = globalVarRegex.exec(content)) !== null) {
+            globalVars.push({ type: match[1], name: match[2], value: match[3] });
+        }
 
-        // Tokenize and prepare training data
-        const tokenToIndex = new Map(
-            Array.from(modelData.vocab).map((token, index) => [token, index])
-        );
+        return globalVars;
+    }
 
-        console.log('Training with templates and keywords');
-        return { trainingComplete: true };
+    analyzeControlStructures(content) {
+        const structures = [];
+        const controlRegex = /\b(if|for|while|switch|case)\b/g;
+        let match;
+
+        while ((match = controlRegex.exec(content)) !== null) {
+            structures.push(match[1]);
+        }
+
+        return structures;
+    }
+
+    updateVocabulary(vocab, keywords) {
+        keywords.forEach(keyword => vocab.add(keyword));
+    }
+
+    saveTemplates(templates, vocab) {
+        const modelPath = path.join(__dirname, 'model.json');
+        const vocabPath = path.join(__dirname, 'vocab.json');
+
+        fs.writeFileSync(modelPath, JSON.stringify(templates, null, 2));
+        fs.writeFileSync(vocabPath, JSON.stringify(Array.from(vocab), null, 2));
+
+        console.log('Templates and vocabulary saved.');
     }
 }
 
-// Increase Node.js memory and enable garbage collection
-process.env.NODE_OPTIONS = '--max_old_space_size=8192 --expose-gc';
-
-const trainer = new ArduinoCodeTemplateTrainer('./arduino_code');
-trainer.train().catch(console.error);
+// Run the extraction
+const extractor = new TemplateExtractor('./arduino_code');
+extractor.extractTemplates();
