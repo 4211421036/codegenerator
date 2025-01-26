@@ -64,23 +64,22 @@
                 return "AI Model not loaded. Please try again.";
             }
 
-            // Edit input to align with the correct format based on the model
+            // Process the input to match model keywords
             const processedInput = this.processInput(input);
 
-            // Build code dynamically based on the model and input
+            // Build code dynamically based on the processed input
             const code = this.buildCodeFromInput(processedInput);
             return code;
         }
 
         processInput(input) {
-            // Process the input and make it more structured for generating code
-            let processedInput = input.toLowerCase(); // Make input lowercase for consistency
+            let processedInput = input.toLowerCase(); // Normalize the input to lowercase
 
-            // Example of using the model to edit or transform the input to match device keywords
-            this.model.devices.forEach(device => {
-                device.keywords.forEach(keyword => {
+            // Replace any keywords found in the input with the corresponding device names or structures
+            this.model.templates.forEach(template => {
+                template.keywords.forEach(keyword => {
                     if (processedInput.includes(keyword.toLowerCase())) {
-                        processedInput = processedInput.replace(keyword.toLowerCase(), device.name.toLowerCase());
+                        processedInput = processedInput.replace(keyword.toLowerCase(), template.name.toLowerCase());
                     }
                 });
             });
@@ -92,24 +91,25 @@
             let code = "";
             let usedLibraries = new Set();
 
-            // Iterate over the devices and generate code based on the processed input
-            this.model.devices.forEach(device => {
-                if (input.includes(device.name.toLowerCase())) {
-                    device.libraries.forEach(lib => {
+            // Iterate over the templates and generate code based on the processed input
+            this.model.templates.forEach(template => {
+                if (input.includes(template.name.toLowerCase())) {
+                    // Include libraries associated with the template
+                    template.libraries.forEach(lib => {
                         if (!usedLibraries.has(lib)) {
                             code += `#include <${lib}.h>\n`;
                             usedLibraries.add(lib);
                         }
                     });
 
-                    // Add functions related to the matched device
-                    device.functions.forEach(func => {
+                    // Add functions related to the matched template
+                    template.functions.forEach(func => {
                         code += `\nvoid ${func.name}() {\n  ${func.body}\n}\n`;
                     });
                 }
             });
 
-            // Add loop function if no matches were found
+            // If no matching templates are found, add a generic loop function
             if (code.length === 0) {
                 code += `\nvoid loop() {\n  // Your logic here\n}\n`;
             }
