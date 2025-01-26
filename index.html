@@ -49,12 +49,10 @@
         function generateArduinoCode(keywords, modelData) {
             let code = "";
             let libraries = new Set();
-            let usedTemplates = new Set();
 
             modelData.templates.forEach(template => {
                 // If template matches any detected keyword
                 if (keywords.some(keyword => template.keywords.includes(keyword))) {
-                    usedTemplates.add(template.name);
                     code += `// ${template.name}\n`;
 
                     // Add libraries to the list, ensuring no duplicates
@@ -67,7 +65,7 @@
             });
 
             // If no templates match, combine multiple templates
-            if (usedTemplates.size === 0) {
+            if (code === "") {
                 modelData.templates.forEach(template => {
                     code += `// ${template.name}\n`;
 
