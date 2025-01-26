@@ -51,7 +51,6 @@
 
         async loadModel() {
             try {
-                // Load model.json
                 const modelResponse = await fetch('https://4211421036.github.io/codegenerator/ai_model/model.json');
                 this.model = await modelResponse.json();
                 console.log("Model loaded successfully");
@@ -60,69 +59,58 @@
             }
         }
 
-        generateCode(input) {
+        async generateCode(input) {
             if (!this.model) {
                 return "AI Model not loaded. Please try again.";
             }
 
-            // Dynamic matching of keywords, functions, and libraries
-            const matchedFunctions = this.matchFunctions(input);
-            const matchedLibraries = this.matchLibraries(input);
+            // Edit input to align with the correct format based on the model
+            const processedInput = this.processInput(input);
 
-            // Build the code dynamically based on matches
-            const generatedCode = this.buildCode(matchedFunctions, matchedLibraries);
-            return generatedCode;
+            // Build code dynamically based on the model and input
+            const code = this.buildCodeFromInput(processedInput);
+            return code;
         }
 
-        matchFunctions(input) {
-            // Pastikan input dan item.name ada sebelum memanggil toLowerCase()
-            if (!input || typeof input !== 'string') {
-                return [];  // Kembalikan array kosong jika input tidak valid
-            }
-        
-            const matched = this.model.filter(item => {
-                // Pastikan item.name ada sebelum memanggil toLowerCase()
-                return item.name && input.toLowerCase().includes(item.name.toLowerCase());
+        processInput(input) {
+            // Process the input and make it more structured for generating code
+            let processedInput = input.toLowerCase(); // Make input lowercase for consistency
+
+            // Example of using the model to edit or transform the input to match device keywords
+            this.model.devices.forEach(device => {
+                device.keywords.forEach(keyword => {
+                    if (processedInput.includes(keyword.toLowerCase())) {
+                        processedInput = processedInput.replace(keyword.toLowerCase(), device.name.toLowerCase());
+                    }
+                });
             });
-        
-            return matched.length > 0 ? matched[0].functions : [];
+
+            return processedInput;
         }
-        
-        matchLibraries(input) {
-            if (!input || typeof input !== 'string') {
-                return [];  // Kembalikan array kosong jika input tidak valid
-            }
-        
-            let matchedLibraries = [];
-            this.model.forEach(item => {
-                if (item.keywords && Array.isArray(item.keywords)) {
-                    item.keywords.forEach(keyword => {
-                        // Pastikan keyword ada sebelum memanggil toLowerCase()
-                        if (keyword && input.toLowerCase().includes(keyword.toLowerCase())) {
-                            matchedLibraries = [...new Set([...matchedLibraries, ...item.libraries])];
+
+        buildCodeFromInput(input) {
+            let code = "";
+            let usedLibraries = new Set();
+
+            // Iterate over the devices and generate code based on the processed input
+            this.model.devices.forEach(device => {
+                if (input.includes(device.name.toLowerCase())) {
+                    device.libraries.forEach(lib => {
+                        if (!usedLibraries.has(lib)) {
+                            code += `#include <${lib}.h>\n`;
+                            usedLibraries.add(lib);
                         }
+                    });
+
+                    // Add functions related to the matched device
+                    device.functions.forEach(func => {
+                        code += `\nvoid ${func.name}() {\n  ${func.body}\n}\n`;
                     });
                 }
             });
-            return matchedLibraries;
-        }
 
-
-        buildCode(functions, libraries) {
-            let code = "";
-
-            // Add libraries
-            libraries.forEach(lib => {
-                code += `#include <${lib}.h>\n`;
-            });
-
-            // Add setup and loop functions from matched functions
-            functions.forEach(func => {
-                code += `\nvoid ${func.name}() {\n${func.body}\n}\n`;
-            });
-
-            // Add a simple loop function as fallback if no matches
-            if (functions.length === 0) {
+            // Add loop function if no matches were found
+            if (code.length === 0) {
                 code += `\nvoid loop() {\n  // Your logic here\n}\n`;
             }
 
@@ -130,23 +118,23 @@
         }
     }
 
+    // Initialize the generator
     const generator = new AIArduinoCodeGenerator();
 
+    // Wait for the model to load before generating code
     document.getElementById('generateBtn').addEventListener('click', async () => {
         const input = document.getElementById('userInput').value;
         const outputElement = document.getElementById('codeOutput');
-        
-        // Ensure the model is loaded before generating code
+
         if (!generator.model) {
             await generator.loadModel();
         }
 
-        // Generate Arduino code based on input
         const code = await generator.generateCode(input);
         outputElement.textContent = code;
     });
 
-    // Preload model
+    // Preload model on page load
     generator.loadModel();
     </script>
 </body>
