@@ -85,18 +85,18 @@
                 console.error("Invalid input: expected a string, but got:", typeof input);
                 return ""; // Return empty if input is not a valid string
             }
-    
+
             // Normalize the input
             let processedInput = input.toLowerCase();
             console.log("Processed input:", processedInput);
-    
+
             // Validate that keywords exist and are strings
             if (this.model.templates && Array.isArray(this.model.templates)) {
                 this.model.templates.forEach(template => {
                     if (template.keywords && Array.isArray(template.keywords)) {
                         template.keywords.forEach(keyword => {
                             // Check if the keyword is a string and not undefined
-                            if (typeof keyword === 'string') {
+                            if (typeof keyword === 'string' && keyword) {
                                 console.log("Checking keyword:", keyword);
                                 // Check if the input contains the keyword
                                 if (processedInput.includes(keyword.toLowerCase())) {
@@ -113,7 +113,7 @@
             } else {
                 console.error("Model has no templates or templates is not an array");
             }
-    
+
             return processedInput;
         }
     
