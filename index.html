@@ -18,6 +18,7 @@
             height: 100vh;
             text-align: center;
             box-sizing: border-box;
+            transition: background-color 0.3s ease;
         }
 
         .container {
@@ -27,6 +28,7 @@
             background-color: white;
             border-radius: 10px;
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            position: relative;
         }
 
         h1 {
@@ -85,14 +87,27 @@
             max-width: 100%;
             word-wrap: break-word;
             overflow-wrap: break-word;
+            line-height: 1.5;
+            text-align: left;
+            position: relative;
+            overflow: hidden;
         }
 
-        /* Typing Animation */
+        .syntax-highlight {
+            color: #00ff00; /* Green for code */
+        }
+
+        .syntax-function {
+            color: #ff6600; /* Orange for functions */
+        }
+
+        /* Typing Animation with caret color */
         .typing {
-            border-right: 3px solid #f5f5f5;
+            border-right: 3px solid transparent;
             animation: typing 2s steps(30) 1s forwards, blink 0.75s step-end infinite;
             white-space: nowrap;
             overflow: hidden;
+            display: inline-block;
         }
 
         @keyframes typing {
@@ -106,14 +121,22 @@
 
         @keyframes blink {
             50% {
-                border-color: transparent;
+                border-color: #f5f5f5;
             }
         }
 
-        /* Responsive Design */
+        /* Mobile Styles */
         @media (max-width: 768px) {
             .container {
                 padding: 20px;
+                position: absolute;
+                bottom: 0;
+                top: auto;
+                height: 100%;
+                width: 100%;
+                background-color: rgba(255, 255, 255, 0.9);
+                border-radius: 0;
+                box-shadow: none;
             }
 
             h1 {
@@ -127,6 +150,45 @@
             button {
                 font-size: 0.9rem;
             }
+
+            body {
+                background-color: rgba(0, 0, 0, 0.5);
+                backdrop-filter: blur(10px);
+            }
+
+            .container {
+                background-color: white;
+                box-shadow: none;
+            }
+
+            #code-output {
+                font-size: 1.2rem;
+            }
+        }
+
+        /* Mobile-specific adjustments */
+        .mobile-input {
+            position: fixed;
+            bottom: 0;
+            width: 100%;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+            padding: 10px 20px;
+        }
+
+        .mobile-input textarea {
+            width: calc(100% - 40px);
+            height: 60px;
+            border-radius: 10px;
+            padding: 10px;
+            font-size: 1rem;
+            border: 1px solid #ddd;
+        }
+
+        .mobile-input button {
+            width: 100%;
+            font-size: 1.1rem;
         }
     </style>
 </head>
@@ -141,6 +203,11 @@
 
         <h2>Generated Code:</h2>
         <div id="code-output" class="typing"></div>
+    </div>
+
+    <div class="mobile-input">
+        <textarea id="mobile-description" rows="3" placeholder="Describe your project..."></textarea>
+        <button id="mobile-generate-btn">Generate Arduino Code</button>
     </div>
 
     <script>
@@ -186,13 +253,13 @@
 
                 selectedTemplate.functions.forEach(func => {
                     if (func.name === "setup" || func.name === "loop") {
-                        code += `void ${func.name}() {\n  ${func.body}\n}\n\n`;
+                        code += `<span class="syntax-function">void ${func.name}()</span> {\n  ${func.body}\n}\n\n`;
                     }
                 });
 
                 let librariesCode = "";
                 libraries.forEach(lib => {
-                    librariesCode += `#include <${lib}>\n`;
+                    librariesCode += `#include <span class="syntax-highlight">${lib}</span>\n`;
                 });
 
                 return librariesCode + "\n" + code;
@@ -201,7 +268,7 @@
             }
         }
 
-        // Event listener for the generate button
+        // Event listener for the generate button (Desktop)
         document.getElementById('generate-btn').addEventListener('click', async () => {
             const description = document.getElementById('description').value;
             if (!description) {
@@ -220,10 +287,37 @@
             let index = 0;
             const typingSpeed = 50;
 
-            // Type out the generated code with animation
             function typeWriter() {
                 if (index < generatedCode.length) {
-                    outputArea.textContent += generatedCode.charAt(index);
+                    outputArea.innerHTML += generatedCode.charAt(index); // Use innerHTML for formatting
+                    index++;
+                    setTimeout(typeWriter, typingSpeed);
+                }
+            }
+
+            typeWriter();
+        });
+
+        // Event listener for the mobile generate button
+        document.getElementById('mobile-generate-btn').addEventListener('click', async () => {
+            const description = document.getElementById('mobile-description').value;
+            if (!description) {
+                alert("Please enter a project description.");
+                return;
+            }
+
+            const modelData = await loadModelData();
+            const detectedKeywords = detectKeywords(description, modelData);
+            const generatedCode = generateArduinoCode(detectedKeywords, modelData);
+
+            const outputArea = document.getElementById('code-output');
+            outputArea.textContent = ''; // Clear previous content
+            let index = 0;
+            const typingSpeed = 50;
+
+            function typeWriter() {
+                if (index < generatedCode.length) {
+                    outputArea.innerHTML += generatedCode.charAt(index);
                     index++;
                     setTimeout(typeWriter, typingSpeed);
                 }
