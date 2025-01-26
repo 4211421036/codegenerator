@@ -53,7 +53,7 @@
             try {
                 const modelResponse = await fetch('https://4211421036.github.io/codegenerator/ai_model/model.json');
                 this.model = await modelResponse.json();
-                console.log("Model loaded successfully");
+                console.log("Model loaded successfully:", this.model);
             } catch (error) {
                 console.error("Model loading failed:", error);
             }
@@ -87,6 +87,7 @@
             }
     
             let processedInput = input.toLowerCase(); // Make input lowercase for consistency
+            console.log("Processed input:", processedInput);
     
             // Ensure the model contains templates with the expected structure
             if (this.model.templates && Array.isArray(this.model.templates)) {
@@ -103,7 +104,7 @@
                             }
                         });
                     } else {
-                        console.error("Template has no keywords or keywords is not an array");
+                        console.error("Template has no keywords or keywords is not an array:", template);
                     }
                 });
             } else {
