@@ -128,10 +128,23 @@ class TemplateExtractor {
     // Add async here
     async saveTemplates(templates, vocab) {
         const modelPath = './ai_model';
-        // Save the model asynchronously
-        await model.save(`file://${modelPath}`);
         
-        // You need to ensure vocabPath is defined correctly
+        // Create and train a model (simple example)
+        const model = tf.sequential();
+        model.add(tf.layers.dense({ units: 10, inputShape: [10] }));
+        model.add(tf.layers.dense({ units: 1, activation: 'sigmoid' }));
+
+        model.compile({ optimizer: 'adam', loss: 'binaryCrossentropy', metrics: ['accuracy'] });
+
+        // Dummy data for training (you will need to modify this for your case)
+        const xs = tf.tensor2d([[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]]);
+        const ys = tf.tensor2d([[1]]);
+
+        await model.fit(xs, ys, { epochs: 10 });
+
+        // Save the trained model
+        await model.save(`file://${modelPath}`);
+
         const vocabPath = path.join(modelPath, 'vocab.json');
 
         fs.writeFileSync(path.join(modelPath, 'model.json'), JSON.stringify(templates, null, 2));
