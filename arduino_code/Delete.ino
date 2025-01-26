@@ -1,157 +1,190 @@
+
 /**
- * SYNTAX:
+ * Created by K. Suwatchai (Mobizt)
  *
- * Storage::deleteObject(<AsyncClient>, <FirebaseStorage::Parent>, <AsyncResultCallback>, <uid>);
+ * Email: suwatchai@outlook.com
  *
- * <AsyncClient> - The async client.
- * <FirebaseStorage::Parent> - The FirebaseStorage::Parent object included Storage bucket Id and object in its constructor.
- * <AsyncResultCallback> - The async result callback (AsyncResultCallback).
- * <uid> - The user specified UID of async result (optional).
+ * Github: https://github.com/mobizt
  *
- * The bucketid is the Storage bucket Id of object to delete.
- * The object is the object in Storage bucket to delete.
+ * Copyright (c) 2023 mobizt
  *
- * The complete usage guidelines, please visit https://github.com/mobizt/FirebaseClient
  */
 
+// This example shows how to delete spreadsheet from Google Drive.
+
 #include <Arduino.h>
-#if defined(ESP32) || defined(ARDUINO_RASPBERRY_PI_PICO_W) || defined(ARDUINO_GIGA) || defined(ARDUINO_OPTA)
+#if defined(ESP32) || defined(ARDUINO_RASPBERRY_PI_PICO_W)
 #include <WiFi.h>
 #elif defined(ESP8266)
 #include <ESP8266WiFi.h>
-#elif __has_include(<WiFiNINA.h>) || defined(ARDUINO_NANO_RP2040_CONNECT)
+#elif __has_include(<WiFiNINA.h>)
 #include <WiFiNINA.h>
 #elif __has_include(<WiFi101.h>)
 #include <WiFi101.h>
-#elif __has_include(<WiFiS3.h>) || defined(ARDUINO_UNOWIFIR4)
+#elif __has_include(<WiFiS3.h>)
 #include <WiFiS3.h>
-#elif __has_include(<WiFiC3.h>) || defined(ARDUINO_PORTENTA_C33)
-#include <WiFiC3.h>
-#elif __has_include(<WiFi.h>)
-#include <WiFi.h>
 #endif
 
-#include <FirebaseClient.h>
+// For SD/SD_MMC mounting helper
+#include <GS_SDHelper.h>
 
 #define WIFI_SSID "WIFI_AP"
 #define WIFI_PASSWORD "WIFI_PASSWORD"
 
-// The API key can be obtained from Firebase console > Project Overview > Project settings.
-#define API_KEY "Web_API_KEY"
+// For how to create Service Account and how to use the library, go to https://github.com/mobizt/ESP-Google-Sheet-Client
 
-// User Email and password that already registerd or added in your project.
-#define USER_EMAIL "USER_EMAIL"
-#define USER_PASSWORD "USER_PASSWORD"
+#define PROJECT_ID "PROJECT_ID"
 
-// Define the Firebase storage bucket ID e.g bucket-name.appspot.com */
-#define STORAGE_BUCKET_ID "BUCKET-NAME.appspot.com"
+// Service Account's client email
+#define CLIENT_EMAIL "CLIENT_EMAIL"
 
-void asyncCB(AsyncResult &aResult);
+// Service Account's private key
+const char PRIVATE_KEY[] PROGMEM = "-----BEGIN PRIVATE KEY-----XXXXXXXXXXXX-----END PRIVATE KEY-----\n";
 
-void printResult(AsyncResult &aResult);
+/**
+const char rootCACert[] PROGMEM = "-----BEGIN CERTIFICATE-----\n"
+                                  "MIIFVzCCAz+gAwIBAgINAgPlk28xsBNJiGuiFzANBgkqhkiG9w0BAQwFADBHMQsw\n"
+                                  "CQYDVQQGEwJVUzEiMCAGA1UEChMZR29vZ2xlIFRydXN0IFNlcnZpY2VzIExMQzEU\n"
+                                  "MBIGA1UEAxMLR1RTIFJvb3QgUjEwHhcNMTYwNjIyMDAwMDAwWhcNMzYwNjIyMDAw\n"
+                                  "MDAwWjBHMQswCQYDVQQGEwJVUzEiMCAGA1UEChMZR29vZ2xlIFRydXN0IFNlcnZp\n"
+                                  "Y2VzIExMQzEUMBIGA1UEAxMLR1RTIFJvb3QgUjEwggIiMA0GCSqGSIb3DQEBAQUA\n"
+                                  "A4ICDwAwggIKAoICAQC2EQKLHuOhd5s73L+UPreVp0A8of2C+X0yBoJx9vaMf/vo\n"
+                                  "27xqLpeXo4xL+Sv2sfnOhB2x+cWX3u+58qPpvBKJXqeqUqv4IyfLpLGcY9vXmX7w\n"
+                                  "Cl7raKb0xlpHDU0QM+NOsROjyBhsS+z8CZDfnWQpJSMHobTSPS5g4M/SCYe7zUjw\n"
+                                  "TcLCeoiKu7rPWRnWr4+wB7CeMfGCwcDfLqZtbBkOtdh+JhpFAz2weaSUKK0Pfybl\n"
+                                  "qAj+lug8aJRT7oM6iCsVlgmy4HqMLnXWnOunVmSPlk9orj2XwoSPwLxAwAtcvfaH\n"
+                                  "szVsrBhQf4TgTM2S0yDpM7xSma8ytSmzJSq0SPly4cpk9+aCEI3oncKKiPo4Zor8\n"
+                                  "Y/kB+Xj9e1x3+naH+uzfsQ55lVe0vSbv1gHR6xYKu44LtcXFilWr06zqkUspzBmk\n"
+                                  "MiVOKvFlRNACzqrOSbTqn3yDsEB750Orp2yjj32JgfpMpf/VjsPOS+C12LOORc92\n"
+                                  "wO1AK/1TD7Cn1TsNsYqiA94xrcx36m97PtbfkSIS5r762DL8EGMUUXLeXdYWk70p\n"
+                                  "aDPvOmbsB4om3xPXV2V4J95eSRQAogB/mqghtqmxlbCluQ0WEdrHbEg8QOB+DVrN\n"
+                                  "VjzRlwW5y0vtOUucxD/SVRNuJLDWcfr0wbrM7Rv1/oFB2ACYPTrIrnqYNxgFlQID\n"
+                                  "AQABo0IwQDAOBgNVHQ8BAf8EBAMCAYYwDwYDVR0TAQH/BAUwAwEB/zAdBgNVHQ4E\n"
+                                  "FgQU5K8rJnEaK0gnhS9SZizv8IkTcT4wDQYJKoZIhvcNAQEMBQADggIBAJ+qQibb\n"
+                                  "C5u+/x6Wki4+omVKapi6Ist9wTrYggoGxval3sBOh2Z5ofmmWJyq+bXmYOfg6LEe\n"
+                                  "QkEzCzc9zolwFcq1JKjPa7XSQCGYzyI0zzvFIoTgxQ6KfF2I5DUkzps+GlQebtuy\n"
+                                  "h6f88/qBVRRiClmpIgUxPoLW7ttXNLwzldMXG+gnoot7TiYaelpkttGsN/H9oPM4\n"
+                                  "7HLwEXWdyzRSjeZ2axfG34arJ45JK3VmgRAhpuo+9K4l/3wV3s6MJT/KYnAK9y8J\n"
+                                  "ZgfIPxz88NtFMN9iiMG1D53Dn0reWVlHxYciNuaCp+0KueIHoI17eko8cdLiA6Ef\n"
+                                  "MgfdG+RCzgwARWGAtQsgWSl4vflVy2PFPEz0tv/bal8xa5meLMFrUKTX5hgUvYU/\n"
+                                  "Z6tGn6D/Qqc6f1zLXbBwHSs09dR2CQzreExZBfMzQsNhFRAbd03OIozUhfJFfbdT\n"
+                                  "6u9AWpQKXCBfTkBdYiJ23//OYb2MI3jSNwLgjt7RETeJ9r/tSQdirpLsQBqvFAnZ\n"
+                                  "0E6yove+7u7Y/9waLd64NnHi/Hm3lCXRSHNboTXns5lndcEZOitHTtNCjv0xyBZm\n"
+                                  "2tIMPNuzjsmhDYAPexZ3FL//2wmUspO8IFgV6dtxQ/PeEMMA3KgqlbbC1j+Qa3bb\n"
+                                  "bP6MvPJwNQzcmRk13NfIRmPVNnGuV/u3gm3c\n"
+                                  "-----END CERTIFICATE-----\n";
+*/
 
-DefaultNetwork network; // initilize with boolean parameter to enable/disable network reconnection
+bool taskComplete = false;
 
-UserAuth user_auth(API_KEY, USER_EMAIL, USER_PASSWORD, 3000 /* expire period in seconds (<= 3600) */);
-
-FirebaseApp app;
-
-#if defined(ESP32) || defined(ESP8266) || defined(ARDUINO_RASPBERRY_PI_PICO_W)
-#include <WiFiClientSecure.h>
-WiFiClientSecure ssl_client;
-#elif defined(ARDUINO_ARCH_SAMD) || defined(ARDUINO_UNOWIFIR4) || defined(ARDUINO_GIGA) || defined(ARDUINO_OPTA) || defined(ARDUINO_PORTENTA_C33) || defined(ARDUINO_NANO_RP2040_CONNECT)
-#include <WiFiSSLClient.h>
-WiFiSSLClient ssl_client;
+#if defined(ARDUINO_RASPBERRY_PI_PICO_W)
+WiFiMulti multi;
 #endif
 
-using AsyncClient = AsyncClientClass;
-
-AsyncClient aClient(ssl_client, getNetwork(network));
-
-Storage storage;
-
-bool taskCompleted = false;
+void tokenStatusCallback(TokenInfo info);
 
 void setup()
 {
+
     Serial.begin(115200);
+    Serial.println();
+    Serial.println();
+
+    GSheet.printf("ESP Google Sheet Client v%s\n\n", ESP_GOOGLE_SHEET_CLIENT_VERSION);
+
+#if defined(ESP32) || defined(ESP8266)
+    WiFi.setAutoReconnect(true);
+#endif
+
+#if defined(ARDUINO_RASPBERRY_PI_PICO_W)
+    GSheet.clearAP();
+    multi.addAP(WIFI_SSID, WIFI_PASSWORD);
+    multi.run();
+#else
     WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+#endif
 
     Serial.print("Connecting to Wi-Fi");
+    unsigned long ms = millis();
     while (WiFi.status() != WL_CONNECTED)
     {
         Serial.print(".");
         delay(300);
+#if defined(ARDUINO_RASPBERRY_PI_PICO_W)
+        if (millis() - ms > 10000)
+            break;
+#endif
     }
     Serial.println();
     Serial.print("Connected with IP: ");
     Serial.println(WiFi.localIP());
     Serial.println();
 
-    Firebase.printf("Firebase Client v%s\n", FIREBASE_CLIENT_VERSION);
+    // In case SD/SD_MMC storage file access, mount the SD/SD_MMC card.
+    // SD_Card_Mounting(); // See src/GS_SDHelper.h
 
-    Serial.println("Initializing app...");
+    // GSheet.setCert(rootCACert); // or GSheet.setCertFile("path/to/certificate/file.pem", esp_google_sheet_file_storage_type_flash /* or esp_google_sheet_file_storage_type_sd */);
 
-#if defined(ESP32) || defined(ESP8266) || defined(PICO_RP2040)
-    ssl_client.setInsecure();
-#if defined(ESP8266)
-    ssl_client.setBufferSizes(4096, 1024);
+    // Set the callback for Google API access token generation status (for debug only)
+    GSheet.setTokenCallback(tokenStatusCallback);
+
+    // The WiFi credentials are required for Pico W
+    // due to it does not have reconnect feature.
+#if defined(ARDUINO_RASPBERRY_PI_PICO_W)
+    GSheet.addAP(WIFI_SSID, WIFI_PASSWORD);
 #endif
-#endif
 
-    initializeApp(aClient, app, getAuth(user_auth), asyncCB, "authTask");
+    // Set the seconds to refresh the auth token before expire (60 to 3540, default is 300 seconds)
+    GSheet.setPrerefreshSeconds(10 * 60);
 
-    // Binding the FirebaseApp for authentication handler.
-    // To unbind, use storage.resetApp();
-    app.getApp<Storage>(storage);
+    // Begin the access token generation for Google API authentication
+    GSheet.begin(CLIENT_EMAIL, PROJECT_ID, PRIVATE_KEY);
+
+    // Or begin with the Service Account JSON file
+    // GSheet.begin("path/to/serviceaccount/json/file", esp_google_sheet_file_storage_type_flash /* or esp_google_sheet_file_storage_type_sd */);
 }
 
 void loop()
 {
-    // The async task handler should run inside the main loop
-    // without blocking delay or bypassing with millis code blocks.
+    // Call ready() repeatedly in loop for authentication checking and processing
+    bool ready = GSheet.ready();
 
-    app.loop();
-
-    storage.loop();
-
-    if (app.ready() && !taskCompleted)
+    if (ready && !taskComplete)
     {
-        taskCompleted = true;
+        // For basic FirebaseJson usage example, see examples/FirebaseJson/Create_Edit_Parse/Create_Edit_Parse.ino
 
-        Serial.println("Delete object...");
+        FirebaseJson response;
+        // Instead of using FirebaseJson for response, you can use String for response to the functions
+        // especially in low memory device that deserializing large JSON response may be failed as in ESP8266
 
-        storage.deleteObject(aClient, FirebaseStorage::Parent(STORAGE_BUCKET_ID, "media.mp4"), asyncCB, "deleteTask");
+        Serial.println("\nDelete spreadsheet from Google Drive...");
+        Serial.println("------------------------------------------------");
+
+        bool success = GSheet.deleteFile(&response /* returned response */, "<spreadsheetId>" /* spreadsheet Id to delete */);
+        response.toString(Serial, true);
+        Serial.println();
+
+        Serial.println("\nDelete last 5 spreadsheets from Google Drive...");
+        Serial.println("------------------------------------------------");
+
+        success = GSheet.deleteFiles(&response /* returned response */);
+
+        if (success)
+            Serial.println("ok");
+
+        taskComplete = true;
     }
 }
 
-void asyncCB(AsyncResult &aResult)
+void tokenStatusCallback(TokenInfo info)
 {
-    // WARNING!
-    // Do not put your codes inside the callback and printResult.
-
-    printResult(aResult);
-}
-
-void printResult(AsyncResult &aResult)
-{
-    if (aResult.isEvent())
+    if (info.status == token_status_error)
     {
-        Firebase.printf("Event task: %s, msg: %s, code: %d\n", aResult.uid().c_str(), aResult.appEvent().message().c_str(), aResult.appEvent().code());
+        GSheet.printf("Token info: type = %s, status = %s\n", GSheet.getTokenType(info).c_str(), GSheet.getTokenStatus(info).c_str());
+        GSheet.printf("Token error: %s\n", GSheet.getTokenError(info).c_str());
     }
-
-    if (aResult.isDebug())
+    else
     {
-        Firebase.printf("Debug task: %s, msg: %s\n", aResult.uid().c_str(), aResult.debug().c_str());
-    }
-
-    if (aResult.isError())
-    {
-        Firebase.printf("Error task: %s, msg: %s, code: %d\n", aResult.uid().c_str(), aResult.error().message().c_str(), aResult.error().code());
-    }
-
-    if (aResult.available())
-    {
-        Firebase.printf("task: %s, payload: %s\n", aResult.uid().c_str(), aResult.c_str());
+        GSheet.printf("Token info: type = %s, status = %s\n", GSheet.getTokenType(info).c_str(), GSheet.getTokenStatus(info).c_str());
     }
 }

@@ -1,20 +1,16 @@
 /**
  * SYNTAX:
  *
- * Storage::ota(<AsyncClient>, <FirebaseStorage::Parent>, <AsyncResultCallback>, <uid>);
+ * RealtimeDatabase::ota(<AsyncClient>, <path>, <AsyncResult>);
  *
  * <AsyncClient> - The async client.
- * <FirebaseStorage::Parent> - The FirebaseStorage::Parent object included Storage bucket Id, object and/or access token in its constructor.
- * <AsyncResultCallback> - The async result callback (AsyncResultCallback).
- * <uid> - The user specified UID of async result (optional).
- *
- * The bucketid is the Storage bucket Id of object to download.
- * The object is the object in Storage bucket to download.
- * The access token is the Firebase Storage's file access token which used only for priviledge file download access in non-authentication mode (NoAuth).
+ * <path> - The node path that store the base64 encoded string of firmware (bin) file.
+ * <AsyncResult>  - The async result (AsyncResult).
  *
  * The complete usage guidelines, please visit https://github.com/mobizt/FirebaseClient
  */
 
+#include <Arduino.h>
 #if defined(ESP32) || defined(ARDUINO_RASPBERRY_PI_PICO_W) || defined(ARDUINO_GIGA) || defined(ARDUINO_OPTA)
 #include <WiFi.h>
 #elif defined(ESP8266)
@@ -35,7 +31,7 @@
 
 // For Arduino SAMD21 OTA supports.
 // See https://github.com/mobizt/FirebaseClient#ota-update.
-#if defined(ARDUINO_ARCH_SAMD)
+#if defined(ARDUINO_ARCH_SAMD) 
 #include <Internal_Storage_OTA.h>
 #define OTA_STORAGE InternalStorage
 #endif
@@ -49,19 +45,15 @@
 // User Email and password that already registerd or added in your project.
 #define USER_EMAIL "USER_EMAIL"
 #define USER_PASSWORD "USER_PASSWORD"
-
-// Define the Firebase storage bucket ID e.g bucket-name.appspot.com */
-#define STORAGE_BUCKET_ID "BUCKET-NAME.appspot.com"
-
-void asyncCB(AsyncResult &aResult);
+#define DATABASE_URL "URL"
 
 void printResult(AsyncResult &aResult);
 
 void restart();
 
-DefaultNetwork network; // initilize with boolean parameter to enable/disable network reconnection
+DefaultNetwork network;
 
-UserAuth user_auth(API_KEY, USER_EMAIL, USER_PASSWORD, 3000 /* expire period in seconds (<= 3600) */);
+UserAuth user_auth(API_KEY, USER_EMAIL, USER_PASSWORD);
 
 FirebaseApp app;
 
@@ -77,9 +69,11 @@ using AsyncClient = AsyncClientClass;
 
 AsyncClient aClient(ssl_client, getNetwork(network));
 
-Storage storage;
+RealtimeDatabase Database;
 
-bool taskCompleted = false;
+AsyncResult aResult_no_callback;
+
+bool taskComplete = false;
 
 void setup()
 {
@@ -110,11 +104,13 @@ void setup()
 #endif
 #endif
 
-    initializeApp(aClient, app, getAuth(user_auth), asyncCB, "authTask");
+    initializeApp(aClient, app, getAuth(user_auth), aResult_no_callback);
 
     // Binding the FirebaseApp for authentication handler.
-    // To unbind, use storage.resetApp();
-    app.getApp<Storage>(storage);
+    // To unbind, use Database.resetApp();
+    app.getApp<RealtimeDatabase>(Database);
+
+    Database.url(DATABASE_URL);
 }
 
 void loop()
@@ -124,30 +120,22 @@ void loop()
 
     app.loop();
 
-    storage.loop();
+    Database.loop();
 
-    if (app.ready() && !taskCompleted)
+    if (app.ready() && !taskComplete)
     {
-        taskCompleted = true;
+        taskComplete = true;
 
-        Serial.println("OTA update download...");
+        Serial.println("Asynchronous OTA update... ");
 
 #if defined(OTA_STORAGE)
-        storage.setOTAStorage(OTA_STORAGE);
+        Database.setOTAStorage(OTA_STORAGE);
 #endif
 
-        storage.ota(aClient, FirebaseStorage::Parent(STORAGE_BUCKET_ID, "firmware.bin"), asyncCB, "otaTask");
-        // You can provide the access token in case non-authentication mode (NoAuth) for priviledge access file download.
-        // storage.ota(aClient, FirebaseStorage::Parent(STORAGE_BUCKET_ID, "firmware.bin", "access token"), asyncCB, "otaTask");
+        Database.ota(aClient, "/test/firmware/bin", aResult_no_callback);
     }
-}
 
-void asyncCB(AsyncResult &aResult)
-{
-    // WARNING!
-    // Do not put your codes inside the callback and printResult.
-
-    printResult(aResult);
+    printResult(aResult_no_callback);
 }
 
 void printResult(AsyncResult &aResult)
@@ -182,11 +170,7 @@ void printResult(AsyncResult &aResult)
     {
         Firebase.printf("Upload task: %s, uploaded %d%s (%d of %d)\n", aResult.uid().c_str(), aResult.uploadInfo().progress, "%", aResult.uploadInfo().uploaded, aResult.uploadInfo().total);
         if (aResult.uploadInfo().total == aResult.uploadInfo().uploaded)
-        {
             Firebase.printf("Upload task: %s, completed!\n", aResult.uid().c_str());
-            Serial.print("Download URL: ");
-            Serial.println(aResult.uploadInfo().downloadUrl);
-        }
     }
 }
 

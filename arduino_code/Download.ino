@@ -13,17 +13,18 @@
  *
  * SYNTAX:
  *
- * Storage::download(<AsyncClient>, <FirebaseStorage::Parent>, <file_config_data>, <AsyncResultCallback>, <uid>);
+ * bool CloudStorage::download(<AsyncClient>, <FirebaseStorage::Parent>, <file_config_data>, <GoogleCloudStorage::GetOptions>);
  *
  * <AsyncClient> - The async client.
- * <FirebaseStorage::Parent> - The FirebaseStorage::Parent object included Storage bucket Id, object and/or access token in its constructor.
+ * <GoogleCloudStorage::Parent> - The GoogleCloudStorage::Parent object included Storage bucket Id and object in its constructor.
  * <file_config_data> - The filesystem data (file_config_data) obtained from FileConfig class object.
- * <AsyncResultCallback> - The async result callback (AsyncResultCallback).
- * <uid> - The user specified UID of async result (optional).
+ * <GoogleCloudStorage::GetOptions> - The GoogleCloudStorage::GetOptions that holds the get options.
+ * For the get options, see https://cloud.google.com/storage/docs/json_api/v1/objects/get#optional-parameters
  *
  * The bucketid is the Storage bucket Id of object to download.
- * The object is the object in Storage bucket to download.
- * The access token is the Firebase Storage's file access token which used only for priviledge file download access in non-authentication mode (NoAuth).
+ * The object is the object to be downloaded in the Storage bucket.
+ *
+ * This function returns bool status when task is complete.
  *
  * The complete usage guidelines, please visit https://github.com/mobizt/FirebaseClient
  */
@@ -65,28 +66,38 @@ File myFile;
 // The API key can be obtained from Firebase console > Project Overview > Project settings.
 #define API_KEY "Web_API_KEY"
 
-// User Email and password that already registerd or added in your project.
-#define USER_EMAIL "USER_EMAIL"
-#define USER_PASSWORD "USER_PASSWORD"
+/**
+ * This information can be taken from the service account JSON file.
+ *
+ * To download service account file, from the Firebase console, goto project settings,
+ * select "Service accounts" tab and click at "Generate new private key" button
+ */
+#define FIREBASE_PROJECT_ID "PROJECT_ID"
+#define FIREBASE_CLIENT_EMAIL "CLIENT_EMAIL"
+const char PRIVATE_KEY[] PROGMEM = "-----BEGIN PRIVATE KEY-----XXXXXXXXXXXX-----END PRIVATE KEY-----\n";
 
 // Define the Firebase storage bucket ID e.g bucket-name.appspot.com */
 #define STORAGE_BUCKET_ID "BUCKET-NAME.appspot.com"
 
-void asyncCB(AsyncResult &aResult);
+void authHandler();
+
+void timeStatusCB(uint32_t &ts);
 
 void printResult(AsyncResult &aResult);
+
+void printError(int code, const String &msg);
 
 #if defined(ENABLE_FS)
 
 void fileCallback(File &file, const char *filename, file_operating_mode mode);
-
 FileConfig media_file("/media.mp4", fileCallback); // Can be set later with media_file.setFile("/media.mp4", fileCallback);
 
 #endif
 
 DefaultNetwork network; // initilize with boolean parameter to enable/disable network reconnection
 
-UserAuth user_auth(API_KEY, USER_EMAIL, USER_PASSWORD, 3000 /* expire period in seconds (<= 3600) */);
+// ServiceAuth is required for Google Cloud Storage functions.
+ServiceAuth sa_auth(timeStatusCB, FIREBASE_CLIENT_EMAIL, FIREBASE_PROJECT_ID, PRIVATE_KEY, 3000 /* expire period in seconds (<= 3600) */);
 
 FirebaseApp app;
 
@@ -102,9 +113,13 @@ using AsyncClient = AsyncClientClass;
 
 AsyncClient aClient(ssl_client, getNetwork(network));
 
-Storage storage;
+CloudStorage cstorage;
+
+AsyncResult aResult_no_callback;
 
 bool taskCompleted = false;
+
+#define SHOW_PROGRESS
 
 void setup()
 {
@@ -134,11 +149,17 @@ void setup()
 #endif
 #endif
 
-    initializeApp(aClient, app, getAuth(user_auth), asyncCB, "authTask");
+    initializeApp(aClient, app, getAuth(sa_auth), aResult_no_callback);
+
+    authHandler();
 
     // Binding the FirebaseApp for authentication handler.
-    // To unbind, use storage.resetApp();
-    app.getApp<Storage>(storage);
+    // To unbind, use cstorage.resetApp();
+    app.getApp<CloudStorage>(cstorage);
+
+    // In case setting the external async result to the sync task (optional)
+    // To unset, use unsetAsyncResult().
+    aClient.setAsyncResult(aResult_no_callback);
 
 #if defined(ENABLE_FS)
     MY_FS.begin();
@@ -147,12 +168,9 @@ void setup()
 
 void loop()
 {
-    // The async task handler should run inside the main loop
-    // without blocking delay or bypassing with millis code blocks.
+    authHandler();
 
-    app.loop();
-
-    storage.loop();
+    cstorage.loop();
 
     if (app.ready() && !taskCompleted)
     {
@@ -160,21 +178,63 @@ void loop()
 
         Serial.println("Download object...");
 
+        GoogleCloudStorage::GetOptions options;
+
 #if defined(ENABLE_FS)
-        storage.download(aClient, FirebaseStorage::Parent(STORAGE_BUCKET_ID, "media.mp4"), getFile(media_file), asyncCB, "downloadTask");
-        // You can provide the access token in case non-authentication mode (NoAuth) for priviledge access file download.
-        // storage.download(aClient, FirebaseStorage::Parent(STORAGE_BUCKET_ID, "media.mp4", "access token"), getFile(media_file), asyncCB, "downloadTask");
+
+#if defined(SHOW_PROGRESS)
+        cstorage.download(aClient, GoogleCloudStorage::Parent(STORAGE_BUCKET_ID, "media.mp4"), getFile(media_file), options, aResult_no_callback);
+
+        for (;;)
+        {
+            printResult(aResult_no_callback);
+            if (aResult_no_callback.downloadInfo().total == aResult_no_callback.downloadInfo().downloaded || aResult_no_callback.error().code() > 0)
+                break;
+        }
+#else
+        bool result = cstorage.download(aClient, GoogleCloudStorage::Parent(STORAGE_BUCKET_ID, "media.mp4"), getFile(media_file), options);
+
+        if (result)
+            Serial.println("Object downloaded.");
+        else
+            printError(aClient.lastError().code(), aClient.lastError().message());
+#endif
 
 #endif
     }
 }
 
-void asyncCB(AsyncResult &aResult)
+void authHandler()
 {
-    // WARNING!
-    // Do not put your codes inside the callback and printResult.
+    // Blocking authentication handler with timeout
+    unsigned long ms = millis();
+    while (app.isInitialized() && !app.ready() && millis() - ms < 120 * 1000)
+    {
+        // The JWT token processor required for ServiceAuth and CustomAuth authentications.
+        // JWT is a static object of JWTClass and it's not thread safe.
+        // In multi-threaded operations (multi-FirebaseApp), you have to define JWTClass for each FirebaseApp,
+        // and set it to the FirebaseApp via FirebaseApp::setJWTProcessor(<JWTClass>), before calling initializeApp.
+        JWT.loop(app.getAuth());
+        printResult(aResult_no_callback);
+    }
+}
 
-    printResult(aResult);
+void timeStatusCB(uint32_t &ts)
+{
+#if defined(ESP8266) || defined(ESP32) || defined(CORE_ARDUINO_PICO)
+    if (time(nullptr) < FIREBASE_DEFAULT_TS)
+    {
+
+        configTime(3 * 3600, 0, "pool.ntp.org");
+        while (time(nullptr) < FIREBASE_DEFAULT_TS)
+        {
+            delay(100);
+        }
+    }
+    ts = time(nullptr);
+#elif __has_include(<WiFiNINA.h>) || __has_include(<WiFi101.h>)
+    ts = WiFi.getTime();
+#endif
 }
 
 void printResult(AsyncResult &aResult)
@@ -196,23 +256,28 @@ void printResult(AsyncResult &aResult)
 
     if (aResult.downloadProgress())
     {
-        Firebase.printf("Download task: %s, downloaded %d%s (%d of %d)\n", aResult.uid().c_str(), aResult.downloadInfo().progress, "%", aResult.downloadInfo().downloaded, aResult.downloadInfo().total);
+        Firebase.printf("Downloaded, task: %s, %d%s (%d of %d)\n", aResult.uid().c_str(), aResult.downloadInfo().progress, "%", aResult.downloadInfo().downloaded, aResult.downloadInfo().total);
         if (aResult.downloadInfo().total == aResult.downloadInfo().downloaded)
         {
-            Firebase.printf("Download task: %s, completed!\n", aResult.uid().c_str());
+            Firebase.printf("Download task: %s, completed!", aResult.uid().c_str());
         }
     }
 
     if (aResult.uploadProgress())
     {
-        Firebase.printf("Upload task: %s, uploaded %d%s (%d of %d)\n", aResult.uid().c_str(), aResult.uploadInfo().progress, "%", aResult.uploadInfo().uploaded, aResult.uploadInfo().total);
+        Firebase.printf("Uploaded, task: %s, %d%s (%d of %d)\n", aResult.uid().c_str(), aResult.uploadInfo().progress, "%", aResult.uploadInfo().uploaded, aResult.uploadInfo().total);
         if (aResult.uploadInfo().total == aResult.uploadInfo().uploaded)
         {
-            Firebase.printf("Upload task: %s, completed!\n", aResult.uid().c_str());
+            Firebase.printf("Upload task: %s, completed!", aResult.uid().c_str());
             Serial.print("Download URL: ");
             Serial.println(aResult.uploadInfo().downloadUrl);
         }
     }
+}
+
+void printError(int code, const String &msg)
+{
+    Firebase.printf("Error, msg: %s, code: %d\n", msg.c_str(), code);
 }
 
 #if defined(ENABLE_FS)
