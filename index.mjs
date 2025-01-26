@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 
 class TemplateExtractor {
-    constructor(folderPath, maxFiles = 500, maxLength = 500) {
+    constructor(folderPath, maxFiles = 1000, maxLength = 500) {
         this.folderPath = folderPath;
         this.maxFiles = maxFiles;
         this.maxLength = maxLength;
@@ -106,5 +106,5 @@ class TemplateExtractor {
 }
 
 // Run the extraction
-const extractor = new TemplateExtractor('./arduino_code');
+const extractor = new TemplateExtractor('./arduino_code'); // Path to your Arduino code folder
 extractor.extractTemplates();
