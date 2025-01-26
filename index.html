@@ -133,64 +133,10 @@
             }
         }
 
-        /* Mobile Styles */
-        @media (max-width: 768px) {
-            .container {
-                padding: 20px;
-                position: absolute;
-                bottom: 0;
-                top: auto;
-                height: 100%;
-                width: 100%;
-                background-color: rgba(255, 255, 255, 0.9);
-                border-radius: 0;
-                box-shadow: none;
-            }
-
-            h1 {
-                font-size: 1.5rem;
-            }
-
-            textarea {
-                font-size: 0.9rem;
-            }
-
-            button {
-                font-size: 0.9rem;
-            }
-
-            body {
-                background-color: rgba(0, 0, 0, 0.5);
-                backdrop-filter: blur(10px);
-            }
-
-            .container {
-                background-color: white;
-                box-shadow: none;
-            }
-
-            #code-output {
-                font-size: 1.2rem;
-            }
-        }
-
-        /* Hide mobile input on desktop and vice versa */
-        .mobile-input {
-            display: none;
-        }
-
-        @media (max-width: 768px) {
-            .desktop-input {
-                display: none;
-            }
-            .mobile-input {
-                display: block;
-            }
-        }
     </style>
 </head>
 <body>
-    <div class="container desktop-input">
+    <div class="container">
         <h1>Arduino Code Generator</h1>
 
         <label for="description">Enter Project Description:</label>
@@ -200,11 +146,6 @@
 
         <h2>Generated Code:</h2>
         <div id="code-output"></div>
-    </div>
-
-    <div class="mobile-input">
-        <textarea id="mobile-description" rows="3" placeholder="Describe your project..."></textarea>
-        <button id="mobile-generate-btn">Generate Arduino Code</button>
     </div>
 
     <script>
@@ -275,6 +216,14 @@
             return element.innerHTML;
         }
 
+        // Function to apply syntax highlighting
+        function highlightSyntax(code) {
+            return code.replace(/(\/\/.*)/g, "<span class='syntax-comment'>$1</span>")
+                .replace(/\b(int|void|if|else|for|while|switch|case|break|return|auto|include|Serial|Wire|Expander|Power|delay|millis)\b/g, "<span class='syntax-keyword'>$1</span>")
+                .replace(/\b(Serial|Wire|Expander|Power|delay)\b/g, "<span class='syntax-function'>$1</span>")
+                .replace(/([A-Za-z0-9_]+)\s*\(/g, "<span class='syntax-highlight'>$1</span> (");
+        }
+
         // Event listener for the generate button (Desktop)
         document.getElementById('generate-btn').addEventListener('click', async () => {
             const description = document.getElementById('description').value;
@@ -288,45 +237,17 @@
             const detectedKeywords = detectKeywords(description, modelData);
             const generatedCode = generateArduinoCode(detectedKeywords, modelData);
 
-            // Display the generated code in the output area with typing effect
+            // Display the generated code in the output area with syntax highlighting and typing effect
             const outputArea = document.getElementById('code-output');
             outputArea.innerHTML = ''; // Clear previous content
+            const highlightedCode = highlightSyntax(generatedCode);
+
             let index = 0;
             const typingSpeed = 50;
 
             function typeWriter() {
-                if (index < generatedCode.length) {
-                    outputArea.innerHTML += escapeHtml(generatedCode.charAt(index)); // Escape HTML and format
-                    index++;
-                    setTimeout(typeWriter, typingSpeed);
-                }
-            }
-
-            typeWriter();
-        });
-
-        // Event listener for the mobile generate button
-        document.getElementById('mobile-generate-btn').addEventListener('click', async () => {
-            const description = document.getElementById('mobile-description').value;
-            if (!description) {
-                alert("Please enter a project description.");
-                return;
-            }
-
-            // Load model data and generate Arduino code (Mobile version)
-            const modelData = await loadModelData();
-            const detectedKeywords = detectKeywords(description, modelData);
-            const generatedCode = generateArduinoCode(detectedKeywords, modelData);
-
-            // Display the generated code in the output area with typing effect
-            const outputArea = document.getElementById('code-output');
-            outputArea.innerHTML = ''; // Clear previous content
-            let index = 0;
-            const typingSpeed = 50;
-
-            function typeWriter() {
-                if (index < generatedCode.length) {
-                    outputArea.innerHTML += escapeHtml(generatedCode.charAt(index)); // Escape HTML and format
+                if (index < highlightedCode.length) {
+                    outputArea.innerHTML += highlightedCode.charAt(index); // Show highlighted code
                     index++;
                     setTimeout(typeWriter, typingSpeed);
                 }
