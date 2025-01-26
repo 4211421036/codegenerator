@@ -50,37 +50,38 @@
     function generateArduinoCode(keywords, modelData) {
       let code = "";
       let libraries = new Set();
+      let selectedTemplate = null;
       
-      // Only select templates that match detected keywords
-      modelData.templates.forEach(template => {
+      // Only select the first template that matches the detected keywords
+      modelData.templates.some(template => {
         if (keywords.some(keyword => template.keywords.includes(keyword))) {
-          code += `// ${template.name}\n\n`;
-    
-          // Add libraries to the list (make sure to include only those needed)
-          template.libraries.forEach(lib => libraries.add(lib));
-    
-          // Generate setup and loop functions
-          template.functions.forEach(func => {
-            // Ensure that we don't include overly complex templates
-            if (func.name === "setup" || func.name === "loop") {
-              code += `void ${func.name}() {\n  ${func.body}\n}\n\n`;
-            }
-          });
+          selectedTemplate = template; // Select the first matching template
+          return true; // Stop once a match is found
         }
+        return false;
       });
     
-      // If no template matches, return a simple default
-      if (code === "") {
-        code = "// No matching templates found for the given description.\n";
+      if (selectedTemplate) {
+        // Add libraries to the list (make sure to include only those needed)
+        selectedTemplate.libraries.forEach(lib => libraries.add(lib));
+    
+        // Generate setup and loop functions for the selected template
+        selectedTemplate.functions.forEach(func => {
+          if (func.name === "setup" || func.name === "loop") {
+            code += `void ${func.name}() {\n  ${func.body}\n}\n\n`;
+          }
+        });
+    
+        // Include libraries at the top of the generated code
+        let librariesCode = "";
+        libraries.forEach(lib => {
+          librariesCode += `#include <${lib}>\n`;
+        });
+    
+        return librariesCode + "\n" + code;
+      } else {
+        return "// No matching templates found for the given description.\n";
       }
-    
-      // Include libraries at the top of the generated code
-      let librariesCode = "";
-      libraries.forEach(lib => {
-        librariesCode += `#include <${lib}>\n`;
-      });
-    
-      return librariesCode + "\n" + code;
     }
     
     // Event listener for the generate button
@@ -99,7 +100,6 @@
       // Display the generated code in the output area
       document.getElementById('code-output').textContent = generatedCode;
     });
-
     </script>
 </body>
 </html>
