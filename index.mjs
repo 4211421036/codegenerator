@@ -125,13 +125,16 @@ class TemplateExtractor {
         keywords.forEach(keyword => vocab.add(keyword));
     }
 
-    saveTemplates(templates, vocab) {
+    // Add async here
+    async saveTemplates(templates, vocab) {
         const modelPath = './ai_model';
+        // Save the model asynchronously
         await model.save(`file://${modelPath}`);
-        path.join(modelPath, 'model.json'),
-        path.join(modelPath, 'vocab.json'),
         
-        fs.writeFileSync(modelPath, JSON.stringify(templates, null, 2));
+        // You need to ensure vocabPath is defined correctly
+        const vocabPath = path.join(modelPath, 'vocab.json');
+
+        fs.writeFileSync(path.join(modelPath, 'model.json'), JSON.stringify(templates, null, 2));
         fs.writeFileSync(vocabPath, JSON.stringify(Array.from(vocab), null, 2));
 
         console.log('Templates and vocabulary saved.');
