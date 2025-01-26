@@ -126,9 +126,11 @@ class TemplateExtractor {
     }
 
     saveTemplates(templates, vocab) {
-        const modelPath = path.join(__dirname, 'model.json');
-        const vocabPath = path.join(__dirname, 'vocab.json');
-
+        const modelPath = './ai_model';
+        await model.save(`file://${modelPath}`);
+        path.join(modelPath, 'model.json'),
+        path.join(modelPath, 'vocab.json'),
+        
         fs.writeFileSync(modelPath, JSON.stringify(templates, null, 2));
         fs.writeFileSync(vocabPath, JSON.stringify(Array.from(vocab), null, 2));
 
