@@ -75,24 +75,38 @@
         }
 
         matchFunctions(input) {
-            // Use the AI model to identify functions based on input (more dynamic)
-            const matched = this.model.filter(item => input.toLowerCase().includes(item.name.toLowerCase()));
+            // Pastikan input dan item.name ada sebelum memanggil toLowerCase()
+            if (!input || typeof input !== 'string') {
+                return [];  // Kembalikan array kosong jika input tidak valid
+            }
+        
+            const matched = this.model.filter(item => {
+                // Pastikan item.name ada sebelum memanggil toLowerCase()
+                return item.name && input.toLowerCase().includes(item.name.toLowerCase());
+            });
+        
             return matched.length > 0 ? matched[0].functions : [];
         }
-
+        
         matchLibraries(input) {
-            // Match libraries dynamically based on user input (using AI model logic)
+            if (!input || typeof input !== 'string') {
+                return [];  // Kembalikan array kosong jika input tidak valid
+            }
+        
             let matchedLibraries = [];
             this.model.forEach(item => {
-                // Check if the input mentions any of the keywords in the model
-                item.keywords.forEach(keyword => {
-                    if (input.toLowerCase().includes(keyword.toLowerCase())) {
-                        matchedLibraries = [...new Set([...matchedLibraries, ...item.libraries])];
-                    }
-                });
+                if (item.keywords && Array.isArray(item.keywords)) {
+                    item.keywords.forEach(keyword => {
+                        // Pastikan keyword ada sebelum memanggil toLowerCase()
+                        if (keyword && input.toLowerCase().includes(keyword.toLowerCase())) {
+                            matchedLibraries = [...new Set([...matchedLibraries, ...item.libraries])];
+                        }
+                    });
+                }
             });
             return matchedLibraries;
         }
+
 
         buildCode(functions, libraries) {
             let code = "";
