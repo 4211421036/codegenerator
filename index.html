@@ -6,17 +6,15 @@
     <title>Arduino Code Generator</title>
     <style>
         body { font-family: Arial, sans-serif; padding: 20px; }
-        #code-output { white-space: pre-wrap; background-color: #f4f4f4; padding: 10px; border-radius: 5px; }
-        select, button { padding: 10px; margin: 10px 0; }
+        textarea, button { padding: 10px; margin: 10px 0; width: 100%; max-width: 600px; }
+        #code-output { white-space: pre-wrap; background-color: #f4f4f4; padding: 10px; border-radius: 5px; margin-top: 20px; }
     </style>
 </head>
 <body>
     <h1>Arduino Code Generator</h1>
-    
-    <label for="template-select">Choose a Template:</label>
-    <select id="template-select">
-        <option value="">Select Template</option>
-    </select>
+
+    <label for="description">Enter Project Description:</label>
+    <textarea id="description" rows="6" placeholder="Describe your project..."></textarea>
 
     <button id="generate-btn">Generate Arduino Code</button>
 
@@ -24,77 +22,68 @@
     <div id="code-output"></div>
 
     <script>
-        // Load model.json and vocab.json from server
-        async function loadModel() {
-            try {
-                const response = await fetch('model.json');
-                const modelData = await response.json();
-
-                // Populate template options based on loaded model data
-                const templateSelect = document.getElementById('template-select');
-                modelData.templates.forEach(template => {
-                    const option = document.createElement('option');
-                    option.value = template.name;
-                    option.textContent = template.name;
-                    templateSelect.appendChild(option);
-                });
-
-            } catch (error) {
-                console.error('Error loading model.json:', error);
-            }
+        // Function to fetch model data from model.json
+        async function loadModelData() {
+            const response = await fetch('model.json');
+            const modelData = await response.json();
+            return modelData;
         }
 
-        // Generate Arduino code based on selected template
-        function generateArduinoCode(templateName) {
-            const templateSelect = document.getElementById('template-select');
-            const selectedTemplate = templateSelect.value;
-
-            // Find the selected template from the loaded model data
-            fetch('model.json')
-                .then(response => response.json())
-                .then(modelData => {
-                    const template = modelData.templates.find(t => t.name === selectedTemplate);
-
-                    if (template) {
-                        let code = '';
-
-                        // Generate setup and loop functions
-                        code += `void setup() {\n`;
-                        template.functions.forEach(func => {
-                            if (func.name === 'setup') {
-                                code += `    ${func.body}\n`;
-                            }
-                        });
-                        code += `}\n\n`;
-
-                        code += `void loop() {\n`;
-                        template.functions.forEach(func => {
-                            if (func.name === 'loop') {
-                                code += `    ${func.body}\n`;
-                            }
-                        });
-                        code += `}\n`;
-
-                        // Display generated code in the output div
-                        document.getElementById('code-output').textContent = code;
+        // Function to detect keywords in the user input description
+        function detectKeywords(description, modelData) {
+            const detectedKeywords = [];
+            const descriptionLower = description.toLowerCase();
+            
+            modelData.templates.forEach(template => {
+                template.keywords.forEach(keyword => {
+                    if (descriptionLower.includes(keyword)) {
+                        detectedKeywords.push(keyword);
                     }
-                })
-                .catch(error => console.error('Error generating code:', error));
+                });
+            });
+
+            return [...new Set(detectedKeywords)]; // Remove duplicates
         }
 
-        // Initialize the page
-        window.onload = () => {
-            loadModel();
-
-            document.getElementById('generate-btn').addEventListener('click', () => {
-                const selectedTemplate = document.getElementById('template-select').value;
-                if (selectedTemplate) {
-                    generateArduinoCode(selectedTemplate);
-                } else {
-                    alert('Please select a template.');
+        // Function to generate Arduino code based on detected keywords
+        function generateArduinoCode(keywords, modelData) {
+            let code = "";
+            modelData.templates.forEach(template => {
+                // If template matches any detected keyword
+                if (keywords.some(keyword => template.keywords.includes(keyword))) {
+                    code += `// ${template.name}\n`;
+                    code += `void setup() {\n    ${template.functions.setup}\n}\n\n`;
+                    code += `void loop() {\n    ${template.functions.loop}\n}\n\n`;
                 }
             });
-        };
+
+            if (!code) {
+                code = "No matching templates found for the description.";
+            }
+
+            return code;
+        }
+
+        // Event listener for the generate button
+        document.getElementById('generate-btn').addEventListener('click', async () => {
+            const description = document.getElementById('description').value;
+            if (!description) {
+                alert("Please enter a project description.");
+                return;
+            }
+
+            // Load model data from model.json
+            const modelData = await loadModelData();
+
+            // Detect keywords from the description
+            const detectedKeywords = detectKeywords(description, modelData);
+
+            // Generate the Arduino code based on detected keywords
+            const generatedCode = generateArduinoCode(detectedKeywords, modelData);
+
+            // Display the generated code
+            document.getElementById('code-output').textContent = generatedCode;
+        });
     </script>
 </body>
 </html>
