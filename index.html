@@ -52,6 +52,7 @@
 
         async loadModel() {
             try {
+                // Load model and vocabulary
                 const [modelResponse, vocabResponse] = await Promise.all([
                     fetch('https://4211421036.github.io/codegenerator/ai_model/model.json'),
                     fetch('https://4211421036.github.io/codegenerator/ai_model/vocab.json')
@@ -65,144 +66,63 @@
             }
         }
 
-        generateCodeTemplate(projectType) {
-            // More dynamic template generation based on project type
-            const templates = {
-                'sensor': this.generateSensorTemplate(),
-                'motor': this.generateMotorTemplate(),
-                'led': this.generateLEDTemplate(),
-                'default': this.generateDefaultTemplate()
-            };
-
-            return templates[projectType] || templates['default'];
-        }
-
-        generateSensorTemplate() {
-            return `// Sensor Project
-#include <Sensor.h>
-
-Sensor sensorModule;
-
-void setup() {
-  Serial.begin(9600);
-  sensorModule.init();
-}
-
-void loop() {
-  float sensorValue = sensorModule.readValue();
-  Serial.print("Sensor Reading: ");
-  Serial.println(sensorValue);
-  delay(1000);
-}`;
-        }
-
-        generateMotorTemplate() {
-            return `// Motor Control Project
-#include <Motor.h>
-
-Motor motorControl;
-
-void setup() {
-  motorControl.begin();
-  motorControl.setSpeed(100);
-}
-
-void loop() {
-  motorControl.forward();
-  delay(1000);
-  motorControl.stop();
-  delay(500);
-  motorControl.reverse();
-  delay(1000);
-}`;
-        }
-
-        generateLEDTemplate() {
-            return `// LED Control Project
-const int ledPin = 13;
-
-void setup() {
-  pinMode(ledPin, OUTPUT);
-}
-
-void loop() {
-  digitalWrite(ledPin, HIGH);
-  delay(500);
-  digitalWrite(ledPin, LOW);
-  delay(500);
-}`;
-        }
-
-        generateDefaultTemplate() {
-            return `void setup() {
-  Serial.begin(9600);
-  // Initialize your project components
-}
-
-void loop() {
-  // Your main project logic
-  // Add your specific implementation here
-}`;
-        }
-
-        determineProjectType(input) {
-            const projectTypes = {
-                'sensor': ['temperature', 'humidity', 'pressure', 'light'],
-                'motor': ['motor', 'servo', 'stepper'],
-                'led': ['led', 'light', 'blink']
-            };
-
-            for (const [type, keywords] of Object.entries(projectTypes)) {
-                if (keywords.some(keyword => input.toLowerCase().includes(keyword))) {
-                    return type;
-                }
-            }
-
-            return 'default';
-        }
-
-        enhanceCode(baseCode, input) {
-            // Additional code enhancement logic
-            const enhancements = {
-                'serial': () => baseCode.replace('Serial.begin(9600);', 
-                    'Serial.begin(9600);\n  Serial.println("Project initialized");'),
-                'delay': () => baseCode.replace('delay(500);', 
-                    'delay(map(analogRead(A0), 0, 1023, 100, 1000));')
-            };
-
-            Object.values(enhancements).forEach(enhancement => {
-                baseCode = enhancement();
-            });
-
-            return baseCode;
-        }
-
         generateCode(input) {
+            // Check if model is loaded
             if (!this.model || !this.vocab) {
                 return "AI Model not loaded. Please try again.";
             }
 
-            const projectType = this.determineProjectType(input);
-            let generatedCode = this.generateCodeTemplate(projectType);
-            
-            // Enhance code based on input
-            generatedCode = this.enhanceCode(generatedCode, input);
-
+            // Generate code based on model's understanding of the user's input
+            const generatedCode = this.generateCodeFromModel(input);
             return generatedCode;
+        }
+
+        async generateCodeFromModel(input) {
+            // Input should be processed and transformed to suitable format to pass into model
+
+            // Here, let's simulate the AI response (in a real setup, model would generate code here)
+            const prompt = `Generate Arduino code for a project based on this description: ${input}`;
+
+            // Here, you would pass the 'prompt' to your trained model for inference
+            // Assume the model generates the Arduino code string in response
+            // For now, returning a simulated response
+
+            const response = await this.getModelResponse(prompt);
+
+            return response; // The model's generated Arduino code
+        }
+
+        async getModelResponse(prompt) {
+            // For now, simulate an AI-based code generation response (to be replaced with actual model inference)
+            return `// Generated Arduino Code for the project
+#include <Arduino.h>
+
+void setup() {
+  Serial.begin(9600);
+  // Custom project setup
+}
+
+void loop() {
+  // Custom project loop logic
+  Serial.println("Project Running!");
+  delay(1000);
+}`;
         }
     }
 
     const generator = new AIArduinoCodeGenerator();
-    
+
     document.getElementById('generateBtn').addEventListener('click', async () => {
         const input = document.getElementById('userInput').value;
         const outputElement = document.getElementById('codeOutput');
         
+        // Ensure the model is loaded before generating code
         if (!generator.model) {
             await generator.loadModel();
         }
 
-        const code = generator.generateCode(input);
+        // Generate Arduino code based on input
+        const code = await generator.generateCode(input);
         outputElement.textContent = code;
     });
 
