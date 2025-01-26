@@ -48,7 +48,7 @@
         constructor() {
             this.model = null;
         }
-
+    
         async loadModel() {
             try {
                 const modelResponse = await fetch('https://4211421036.github.io/codegenerator/ai_model/model.json');
@@ -58,82 +58,98 @@
                 console.error("Model loading failed:", error);
             }
         }
-
+    
         async generateCode(input) {
             if (!this.model) {
                 return "AI Model not loaded. Please try again.";
             }
-
-            // Process the input to match model keywords
+    
+            // Ensure that the model has the expected structure
+            if (!this.model.templates || !Array.isArray(this.model.templates)) {
+                return "Model structure is incorrect.";
+            }
+    
+            // Edit input to align with the correct format based on the model
             const processedInput = this.processInput(input);
-
-            // Build code dynamically based on the processed input
+    
+            // Build code dynamically based on the model and input
             const code = this.buildCodeFromInput(processedInput);
             return code;
         }
-
+    
         processInput(input) {
-            let processedInput = input.toLowerCase(); // Normalize the input to lowercase
-
-            // Replace any keywords found in the input with the corresponding device names or structures
-            this.model.templates.forEach(template => {
-                template.keywords.forEach(keyword => {
-                    if (processedInput.includes(keyword.toLowerCase())) {
-                        processedInput = processedInput.replace(keyword.toLowerCase(), template.name.toLowerCase());
+            // Process the input and make it more structured for generating code
+            let processedInput = input.toLowerCase(); // Make input lowercase for consistency
+    
+            // Ensure the model contains templates with the expected keywords
+            if (this.model.templates) {
+                this.model.templates.forEach(template => {
+                    if (template.keywords) {
+                        template.keywords.forEach(keyword => {
+                            if (processedInput.includes(keyword.toLowerCase())) {
+                                processedInput = processedInput.replace(keyword.toLowerCase(), template.name.toLowerCase());
+                            }
+                        });
                     }
                 });
-            });
-
+            }
+    
             return processedInput;
         }
-
+    
         buildCodeFromInput(input) {
             let code = "";
             let usedLibraries = new Set();
-
+    
             // Iterate over the templates and generate code based on the processed input
-            this.model.templates.forEach(template => {
-                if (input.includes(template.name.toLowerCase())) {
-                    // Include libraries associated with the template
-                    template.libraries.forEach(lib => {
-                        if (!usedLibraries.has(lib)) {
-                            code += `#include <${lib}.h>\n`;
-                            usedLibraries.add(lib);
+            if (this.model.templates) {
+                this.model.templates.forEach(template => {
+                    if (input.includes(template.name.toLowerCase())) {
+                        // Add libraries for this template
+                        if (template.libraries) {
+                            template.libraries.forEach(lib => {
+                                if (!usedLibraries.has(lib)) {
+                                    code += `#include <${lib}.h>\n`;
+                                    usedLibraries.add(lib);
+                                }
+                            });
                         }
-                    });
-
-                    // Add functions related to the matched template
-                    template.functions.forEach(func => {
-                        code += `\nvoid ${func.name}() {\n  ${func.body}\n}\n`;
-                    });
-                }
-            });
-
-            // If no matching templates are found, add a generic loop function
+    
+                        // Add functions related to the matched template
+                        if (template.functions) {
+                            template.functions.forEach(func => {
+                                code += `\nvoid ${func.name}() {\n  ${func.body}\n}\n`;
+                            });
+                        }
+                    }
+                });
+            }
+    
+            // Add loop function if no matches were found
             if (code.length === 0) {
                 code += `\nvoid loop() {\n  // Your logic here\n}\n`;
             }
-
+    
             return code;
         }
     }
-
+    
     // Initialize the generator
     const generator = new AIArduinoCodeGenerator();
-
+    
     // Wait for the model to load before generating code
     document.getElementById('generateBtn').addEventListener('click', async () => {
         const input = document.getElementById('userInput').value;
         const outputElement = document.getElementById('codeOutput');
-
+    
         if (!generator.model) {
             await generator.loadModel();
         }
-
+    
         const code = await generator.generateCode(input);
         outputElement.textContent = code;
     });
-
+    
     // Preload model on page load
     generator.loadModel();
     </script>
