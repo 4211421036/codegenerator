@@ -92,7 +92,7 @@
             // Membuat elemen untuk tampilan desktop
             createDesktopView() {
                 const desktopApp = document.createElement('desktop-app');
-                desktopApp.setAttribute('text', 'AI Arduino Code Generator');
+                desktopApp.setAttribute('text', 'AI Code Generator');
 
                 const desktopTextArea = document.createElement('desktop-generator-text');
                 desktopTextArea.setAttribute('placeholder', 'Describe your Arduino project...');
@@ -133,25 +133,25 @@
                     }
 
                     mobile-generator-text {
-                        position: fixed;
-                        bottom: 70px;
-                        left: 10px;
-                        right: 10px;
-                        width: calc(100% - 20px);
+                        resize: none;
+                        overflow-y: hidden;
+                        width: calc(100% - 80px);
+                        height: auto;
+                        min-height: 40px;
                         padding: 10px;
                         border-radius: 10px;
                         border: 1px solid #ccc;
                         font-size: 14px;
                         background-color: white;
+                        flex-grow: 1;
+                        margin-right: 10px;
                     }
 
                     mobile-generator-render {
-                        position: fixed;
-                        bottom: 10px;
-                        left: 10px;
-                        right: 10px;
                         display: flex;
                         justify-content: flex-end;
+                        align-items: center;
+                        padding: 5px;
                     }
 
                     mobile-generator-render button {
@@ -161,6 +161,17 @@
                         background-color: #007bff;
                         color: white;
                         border: none;
+                        cursor: pointer;
+                    }
+
+                    .chat-input-container {
+                        display: flex;
+                        position: fixed;
+                        bottom: 10px;
+                        left: 10px;
+                        right: 10px;
+                        align-items: center;
+                        width: calc(100% - 20px);
                     }
 
                     mobile-generator-output {
@@ -190,6 +201,14 @@
                 textarea.name = this.getAttribute('name') || 'project-description';
                 textarea.id = this.getAttribute('id') || 'textarea-id';
                 shadow.appendChild(textarea);
+
+                // Menambahkan event listener untuk menyesuaikan tinggi textarea dengan konten
+                textarea.addEventListener('input', () => this.adjustHeight(textarea));
+            }
+
+            adjustHeight(textarea) {
+                textarea.style.height = 'auto'; // Reset height
+                textarea.style.height = `${textarea.scrollHeight}px`; // Set new height
             }
         }
 
@@ -274,13 +293,13 @@
                 }
             }
 
-            connectedCallback() {
-                if (!this.shadowRoot) {
-                    this.attachShadow({ mode: 'open' });
-                }
+            constructor() {
+                super();
+                this.attachShadow({ mode: 'open' });
             }
         }
 
+        // Define custom elements
         customElements.define('ai-code-generator', AiCodeGenerator);
         customElements.define('mobile-app', MobileApp);
         customElements.define('mobile-generator-text', MobileGeneratorText);
