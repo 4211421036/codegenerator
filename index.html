@@ -100,7 +100,7 @@
             try {
                 const response = await fetch('https://4211421036.github.io/codegenerator/ai_model/model.json');
                 if (!response.ok) {
-                    throw new Error(HTTP error! status: ${response.status});
+                    throw new Error(`HTTP error! status: ${response.status}`);
                 }
                 modelData = await response.json();
                 if (!modelData || !modelData.templates) {
