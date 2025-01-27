@@ -79,10 +79,9 @@
     <script>
         let modelData = null;
 
-        // Load the model.json file
         async function loadModelData() {
             try {
-                const response = await fetch('https://4211421036.github.io/codegenerator/ai_model/model.json'); // Adjust the path as needed
+                const response = await fetch('https://4211421036.github.io/codegenerator/ai_model/model.json); // Sesuaikan path file
                 modelData = await response.json();
                 console.log("Model data loaded:", modelData);
             } catch (error) {
@@ -90,7 +89,6 @@
             }
         }
 
-        // Detect keywords from the description
         function detectKeywords(description) {
             if (!modelData) return [];
             const keywords = [];
@@ -104,7 +102,6 @@
             return [...new Set(keywords)];
         }
 
-        // Find matching templates based on keywords
         function findMatchingTemplates(keywords) {
             if (!modelData) return [];
             return modelData.templates.filter(template =>
@@ -112,7 +109,6 @@
             );
         }
 
-        // Combine templates to generate Arduino code
         function generateArduinoCode(description) {
             const keywords = detectKeywords(description);
             const matchingTemplates = findMatchingTemplates(keywords);
@@ -133,7 +129,6 @@
                 });
             });
 
-            // Build final Arduino code
             let generatedCode = "// Auto-generated Arduino code\n\n";
             libraries.forEach(lib => (generatedCode += `#include <${lib}>\n`));
             generatedCode += `\nvoid setup() {\n${setupCode}}\n\n`;
@@ -142,7 +137,6 @@
             return generatedCode;
         }
 
-        // Handle button click event
         document.getElementById('generate-code').addEventListener('click', () => {
             const description = document.getElementById('description').value.trim();
             if (!description) {
@@ -150,28 +144,10 @@
                 return;
             }
 
-            const keywords = detectKeywords(description);
-            const keywordsContainer = document.getElementById('keywords');
-            const detectedKeywordsElement = document.getElementById('detected-keywords');
-
-            if (keywords.length > 0) {
-                keywordsContainer.style.display = 'block';
-                detectedKeywordsElement.innerHTML = '';
-                keywords.forEach(keyword => {
-                    const chip = document.createElement('span');
-                    chip.className = 'keyword-chip';
-                    chip.textContent = keyword;
-                    detectedKeywordsElement.appendChild(chip);
-                });
-            } else {
-                keywordsContainer.style.display = 'none';
-            }
-
             const code = generateArduinoCode(description);
             document.getElementById('code-output').textContent = code;
         });
 
-        // Load model data on page load
         loadModelData();
     </script>
 </body>
