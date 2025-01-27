@@ -9,19 +9,40 @@
             constructor() {
                 super();
                 this.attachShadow({ mode: 'open' });
-                this.viewMode = 'desktop'; // default mode
-                this.checkDeviceType();
                 this.loadModel = this.getAttribute('load-model') === 'true';
-                this.initTemplate();
+                this.viewMode = this.getViewMode();
+                this.init();
             }
 
-            // Deteksi perangkat dan sesuaikan view mode
-            checkDeviceType() {
+            // Fungsi untuk mendeteksi mode perangkat (mobile/desktop)
+            getViewMode() {
                 const isMobile = window.innerWidth <= 768;
-                this.viewMode = isMobile ? 'mobile' : 'desktop';
+                return isMobile ? 'mobile' : 'desktop';
             }
 
-            connectedCallback() {
+            // Membuat elemen-elemen berdasarkan mode tampilan (mobile/desktop)
+            init() {
+                this.render();
+                window.addEventListener('resize', () => this.onResize());
+            }
+
+            onResize() {
+                const newViewMode = this.getViewMode();
+                if (newViewMode !== this.viewMode) {
+                    this.viewMode = newViewMode;
+                    this.render();
+                }
+            }
+
+            render() {
+                this.clearContent(); // Hapus konten sebelumnya sebelum render ulang
+
+                if (this.viewMode === 'mobile') {
+                    this.createMobileView();
+                } else {
+                    this.createDesktopView();
+                }
+
                 if (this.loadModel) {
                     this.loadModelData();
                 }
@@ -34,84 +55,119 @@
                     this.modelData = await response.json();
                 } catch (error) {
                     console.error("Failed to load model data:", error);
-                    this.shadowRoot.querySelector('error-message').setAttribute('text', 'Failed to load model data.');
+                    this.createErrorMessage('Failed to load model data.');
                 }
             }
 
-            initTemplate() {
-                const themeColor = window.matchMedia('(prefers-color-scheme: dark)').matches ? '#1e1e1e' : '#f9f9f9';
-                const textColor = window.matchMedia('(prefers-color-scheme: dark)').matches ? '#ffffff' : '#333';
-                const template = document.createElement('template');
+            // Menghapus semua elemen di shadow root
+            clearContent() {
+                this.shadowRoot.innerHTML = '';
+            }
+
+            // Membuat elemen untuk tampilan mobile
+            createMobileView() {
+                const mobileApp = document.createElement('mobile-app');
+                mobileApp.setAttribute('text', 'AI Arduino Code Generator');
+
+                const mobileTextArea = document.createElement('mobile-generator-text');
+                mobileTextArea.setAttribute('placeholder', 'Describe your Arduino project...');
+                mobileTextArea.setAttribute('name', 'project-description');
+                mobileTextArea.setAttribute('id', 'textarea-id');
+
+                const mobileButton = document.createElement('mobile-generator-render');
+                const mobileOutput = document.createElement('mobile-generator-output');
+
+                const errorMessage = document.createElement('error-message');
                 
-                template.innerHTML = `
-                    <style>
-                        :host {
-                            display: block;
-                            font-family: Arial, sans-serif;
-                            background-color: ${themeColor};
-                            color: ${textColor};
-                            padding: 20px;
-                        }
-                        :host([view-mode="mobile"]) .desktop-view {
-                            display: none;
-                        }
-                        :host([view-mode="desktop"]) .mobile-view {
-                            display: none;
-                        }
-                        .mobile-view, .desktop-view {
-                            display: flex;
-                            flex-direction: column;
-                            align-items: center;
-                            justify-content: flex-start;
-                            width: 100%;
-                        }
-                        .mobile-view textarea, .desktop-view textarea {
-                            width: 90%;
-                            height: 120px;
-                            padding: 10px;
-                            margin: 10px 0;
-                            border: 1px solid #ccc;
-                            border-radius: 5px;
-                        }
-                        .mobile-view button, .desktop-view button {
-                            padding: 10px 20px;
-                            background-color: #007bff;
-                            color: white;
-                            border: none;
-                            border-radius: 5px;
-                            cursor: pointer;
-                            margin: 10px 0;
-                        }
-                        .mobile-view pre, .desktop-view pre {
-                            background: #272822;
-                            color: #f8f8f2;
-                            padding: 20px;
-                            width: 90%;
-                            overflow-x: auto;
-                            border-radius: 5px;
-                        }
-                        @media (max-width: 768px) {
-                            .mobile-view textarea {
-                                width: 100%;
-                            }
-                        }
-                    </style>
-                    <div class="mobile-view">
-                        <mobile-app text="AI Arduino Code Generator"></mobile-app>
-                        <mobile-generator-text placeholder="Describe your Arduino project..." name="project-description"></mobile-generator-text>
-                        <mobile-generator-render></mobile-generator-render>
-                        <error-message></error-message>
-                        <mobile-generator-output></mobile-generator-output>
-                    </div>
-                    <div class="desktop-view">
-                        <desktop-app text="AI Arduino Code Generator"></desktop-app>
-                        <desktop-generator-text placeholder="Describe your Arduino project..." name="project-description"></desktop-generator-text>
-                        <desktop-generator-render></desktop-generator-render>
-                        <error-message></error-message>
-                        <desktop-generator-output></desktop-generator-output>
-                    </div>
+                this.shadowRoot.appendChild(mobileApp);
+                this.shadowRoot.appendChild(mobileTextArea);
+                this.shadowRoot.appendChild(mobileButton);
+                this.shadowRoot.appendChild(errorMessage);
+                this.shadowRoot.appendChild(mobileOutput);
+
+                // Apply floating and flex layout styles
+                this.applyMobileStyles();
+            }
+
+            // Membuat elemen untuk tampilan desktop
+            createDesktopView() {
+                const desktopApp = document.createElement('desktop-app');
+                desktopApp.setAttribute('text', 'AI Arduino Code Generator');
+
+                const desktopTextArea = document.createElement('desktop-generator-text');
+                desktopTextArea.setAttribute('placeholder', 'Describe your Arduino project...');
+                desktopTextArea.setAttribute('name', 'project-description');
+                desktopTextArea.setAttribute('id', 'textarea-id');
+
+                const desktopButton = document.createElement('desktop-generator-render');
+                const desktopOutput = document.createElement('desktop-generator-output');
+
+                const errorMessage = document.createElement('error-message');
+                
+                this.shadowRoot.appendChild(desktopApp);
+                this.shadowRoot.appendChild(desktopTextArea);
+                this.shadowRoot.appendChild(desktopButton);
+                this.shadowRoot.appendChild(errorMessage);
+                this.shadowRoot.appendChild(desktopOutput);
+            }
+
+            // Menampilkan pesan error
+            createErrorMessage(message) {
+                const errorMessage = document.createElement('error-message');
+                errorMessage.setAttribute('text', message);
+                this.shadowRoot.appendChild(errorMessage);
+            }
+
+            // Menambahkan style untuk tampilan mobile yang seperti chat dengan flex layout
+            applyMobileStyles() {
+                const style = document.createElement('style');
+                style.textContent = `
+                    :host {
+                        display: block;
+                        position: relative;
+                        height: 100vh;
+                    }
+
+                    mobile-app {
+                        padding: 10px;
+                    }
+
+                    mobile-generator-text {
+                        position: fixed;
+                        bottom: 70px;
+                        left: 10px;
+                        right: 10px;
+                        width: calc(100% - 20px);
+                        padding: 10px;
+                        border-radius: 10px;
+                        border: 1px solid #ccc;
+                        font-size: 14px;
+                        background-color: white;
+                    }
+
+                    mobile-generator-render {
+                        position: fixed;
+                        bottom: 10px;
+                        left: 10px;
+                        right: 10px;
+                        display: flex;
+                        justify-content: flex-end;
+                    }
+
+                    mobile-generator-render button {
+                        padding: 10px 20px;
+                        font-size: 14px;
+                        border-radius: 5px;
+                        background-color: #007bff;
+                        color: white;
+                        border: none;
+                    }
+
+                    mobile-generator-output {
+                        margin-top: 80px;
+                    }
                 `;
-                this.shadowRoot.appendChild(template.content.cloneNode(true));
+                this.shadowRoot.appendChild(style);
             }
         }
 
