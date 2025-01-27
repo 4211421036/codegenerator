@@ -202,7 +202,6 @@
                 }
             });
 
-            let generatedCode = "// Auto-generated Arduino code\n\n";
             let generatedCode = "// Auto-generated Arduino code\n// Generated based on your description\n\n";
             libraries.forEach(lib => (generatedCode += `#include <${lib}>\n`));
             generatedCode += '\n';
