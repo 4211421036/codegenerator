@@ -68,6 +68,14 @@
             color: #007bff;
             display: none;
         }
+        .error-message {
+            color: #dc3545;
+            margin-top: 10px;
+            padding: 10px;
+            border: 1px solid #dc3545;
+            border-radius: 4px;
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -76,6 +84,7 @@
         <textarea id="description" placeholder="Describe your Arduino project..."></textarea>
         <button id="generate-code">Generate Code</button>
         <div id="loading">Loading model and generating code...</div>
+        <div id="error-message" class="error-message"></div>
         <div class="keywords" id="keywords" style="display: none;">
             <strong>Detected Keywords:</strong>
             <div id="detected-keywords"></div>
@@ -85,48 +94,78 @@
 
     <script>
         let modelData = null;
+        let isLoading = false;
 
         async function loadModelData() {
             try {
-                const response = await fetch('https://4211421036.github.io/codegenerator/ai_model/model.json'); // Update path sesuai backend Anda
+                const response = await fetch('https://4211421036.github.io/codegenerator/ai_model/model.json');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
                 modelData = await response.json();
-                console.log("Model data loaded:", modelData);
+                if (!modelData || !modelData.templates) {
+                    throw new Error('Invalid model data structure');
+                }
+                console.log("Model data loaded successfully");
             } catch (error) {
-                console.error("Failed to load model.json:", error);
-                alert("Failed to load model data. Please check the server or file path.");
+                console.error("Failed to load model data:", error);
+                showError("Failed to load model data. Please check your connection and try again.");
             }
         }
 
+        function showError(message) {
+            const errorElement = document.getElementById('error-message');
+            errorElement.textContent = message;
+            errorElement.style.display = 'block';
+            setTimeout(() => {
+                errorElement.style.display = 'none';
+            }, 5000);
+        }
+
         function detectKeywords(description) {
-            if (!modelData) return [];
-            const keywords = [];
+            if (!modelData || !modelData.templates) {
+                return [];
+            }
+            const keywords = new Set();
             modelData.templates.forEach(template => {
-                template.keywords.forEach(keyword => {
-                    if (description.toLowerCase().includes(keyword.toLowerCase())) {
-                        keywords.push(keyword);
-                    }
-                });
+                if (template.keywords) {
+                    template.keywords.forEach(keyword => {
+                        if (description.toLowerCase().includes(keyword.toLowerCase())) {
+                            keywords.add(keyword);
+                        }
+                    });
+                }
             });
-            return [...new Set(keywords)];
+            return Array.from(keywords);
         }
 
         function findMatchingTemplates(keywords) {
-            if (!modelData) return [];
+            if (!modelData || !modelData.templates) {
+                return [];
+            }
             return modelData.templates.filter(template =>
-                template.keywords.some(keyword => keywords.includes(keyword))
+                template.keywords && template.keywords.some(keyword => keywords.includes(keyword))
             );
         }
 
         function generateArduinoCode(description) {
+            if (!modelData || !modelData.templates) {
+                showError("Model data not properly loaded. Please refresh the page.");
+                return "// Error: Model data not loaded properly";
+            }
+
             const keywords = detectKeywords(description);
             const matchingTemplates = findMatchingTemplates(keywords);
 
+            // Update keywords display
+            const keywordsElement = document.getElementById('keywords');
+            const keywordSection = document.getElementById('detected-keywords');
+            keywordSection.innerHTML = '';
+
             if (keywords.length === 0) {
-                document.getElementById('keywords').style.display = 'none';
+                keywordsElement.style.display = 'none';
             } else {
-                document.getElementById('keywords').style.display = 'block';
-                const keywordSection = document.getElementById('detected-keywords');
-                keywordSection.innerHTML = '';
+                keywordsElement.style.display = 'block';
                 keywords.forEach(keyword => {
                     const chip = document.createElement('span');
                     chip.className = 'keyword-chip';
@@ -136,55 +175,76 @@
             }
 
             if (matchingTemplates.length === 0) {
-                return "// No matching templates found. Please try again with different keywords.";
+                return "// No matching templates found for your description.\n// Try using different keywords or check the documentation.";
             }
 
-            let libraries = new Set();
+            const libraries = new Set();
+            const variableDeclarations = new Set();
             let setupCode = '';
             let loopCode = '';
-            let variableDeclarations = new Set();
 
             matchingTemplates.forEach(template => {
-                template.libraries.forEach(lib => libraries.add(lib));
-                template.variables.forEach(variable => variableDeclarations.add(variable));
-                template.functions.forEach(func => {
-                    if (func.name === 'setup') setupCode += func.body + '\n';
-                    if (func.name === 'loop') loopCode += func.body + '\n';
-                });
+                if (template.libraries) {
+                    template.libraries.forEach(lib => libraries.add(lib));
+                }
+                if (template.variables) {
+                    template.variables.forEach(variable => variableDeclarations.add(variable));
+                }
+                if (template.functions) {
+                    template.functions.forEach(func => {
+                        if (func.name === 'setup' && func.body) {
+                            setupCode += func.body + '\n';
+                        }
+                        if (func.name === 'loop' && func.body) {
+                            loopCode += func.body + '\n';
+                        }
+                    });
+                }
             });
 
-            let generatedCode = "// Auto-generated Arduino code\n\n";
+            let generatedCode = "// Auto-generated Arduino code\n// Generated based on your description\n\n";
             libraries.forEach(lib => (generatedCode += `#include <${lib}>\n`));
+            generatedCode += '\n';
             variableDeclarations.forEach(variable => (generatedCode += `${variable}\n`));
-            generatedCode += `\nvoid setup() {\n${setupCode}}\n\n`;
-            generatedCode += `void loop() {\n${loopCode}}\n`;
+            generatedCode += '\nvoid setup() {\n' + setupCode + '}\n\n';
+            generatedCode += 'void loop() {\n' + loopCode + '}\n';
 
             return generatedCode;
         }
 
         document.getElementById('generate-code').addEventListener('click', async () => {
+            if (isLoading) return;
+
             const description = document.getElementById('description').value.trim();
             if (!description) {
-                alert("Please enter a project description.");
+                showError("Please enter a project description.");
                 return;
             }
 
             if (!modelData) {
-                alert("Model data not loaded yet. Please wait.");
+                showError("Model data not loaded yet. Please wait or refresh the page.");
                 return;
             }
 
+            isLoading = true;
             document.getElementById('loading').style.display = 'block';
+            document.getElementById('generate-code').disabled = true;
 
-            // Generate and display code
-            setTimeout(() => {
+            try {
                 const code = generateArduinoCode(description);
                 document.getElementById('code-output').textContent = code;
+            } catch (error) {
+                console.error("Error generating code:", error);
+                showError("An error occurred while generating the code. Please try again.");
+            } finally {
                 document.getElementById('loading').style.display = 'none';
-            }, 500); // Simulate loading delay
+                document.getElementById('generate-code').disabled = false;
+                isLoading = false;
+            }
         });
 
-        loadModelData();
+        // Load model data when page loads
+        window.addEventListener('load', loadModelData);
     </script>
 </body>
 </html>
