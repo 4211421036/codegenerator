@@ -9,9 +9,16 @@
             constructor() {
                 super();
                 this.attachShadow({ mode: 'open' });
-                this.viewMode = this.getAttribute('view-mode') || 'desktop';
+                this.viewMode = 'desktop'; // default mode
+                this.checkDeviceType();
                 this.loadModel = this.getAttribute('load-model') === 'true';
                 this.initTemplate();
+            }
+
+            // Deteksi perangkat dan sesuaikan view mode
+            checkDeviceType() {
+                const isMobile = window.innerWidth <= 768;
+                this.viewMode = isMobile ? 'mobile' : 'desktop';
             }
 
             connectedCallback() {
@@ -34,14 +41,16 @@
             initTemplate() {
                 const themeColor = window.matchMedia('(prefers-color-scheme: dark)').matches ? '#1e1e1e' : '#f9f9f9';
                 const textColor = window.matchMedia('(prefers-color-scheme: dark)').matches ? '#ffffff' : '#333';
-                const template = `
+                const template = document.createElement('template');
+                
+                template.innerHTML = `
                     <style>
                         :host {
                             display: block;
                             font-family: Arial, sans-serif;
                             background-color: ${themeColor};
                             color: ${textColor};
-                            padding: 10px;
+                            padding: 20px;
                         }
                         :host([view-mode="mobile"]) .desktop-view {
                             display: none;
@@ -49,75 +58,144 @@
                         :host([view-mode="desktop"]) .mobile-view {
                             display: none;
                         }
+                        .mobile-view, .desktop-view {
+                            display: flex;
+                            flex-direction: column;
+                            align-items: center;
+                            justify-content: flex-start;
+                            width: 100%;
+                        }
+                        .mobile-view textarea, .desktop-view textarea {
+                            width: 90%;
+                            height: 120px;
+                            padding: 10px;
+                            margin: 10px 0;
+                            border: 1px solid #ccc;
+                            border-radius: 5px;
+                        }
+                        .mobile-view button, .desktop-view button {
+                            padding: 10px 20px;
+                            background-color: #007bff;
+                            color: white;
+                            border: none;
+                            border-radius: 5px;
+                            cursor: pointer;
+                            margin: 10px 0;
+                        }
+                        .mobile-view pre, .desktop-view pre {
+                            background: #272822;
+                            color: #f8f8f2;
+                            padding: 20px;
+                            width: 90%;
+                            overflow-x: auto;
+                            border-radius: 5px;
+                        }
+                        @media (max-width: 768px) {
+                            .mobile-view textarea {
+                                width: 100%;
+                            }
+                        }
                     </style>
                     <div class="mobile-view">
                         <mobile-app text="AI Arduino Code Generator"></mobile-app>
-                        <mobile-generator-text placeholder="Describe your Arduino project..."></mobile-generator-text>
+                        <mobile-generator-text placeholder="Describe your Arduino project..." name="project-description"></mobile-generator-text>
                         <mobile-generator-render></mobile-generator-render>
                         <error-message></error-message>
                         <mobile-generator-output></mobile-generator-output>
                     </div>
                     <div class="desktop-view">
                         <desktop-app text="AI Arduino Code Generator"></desktop-app>
-                        <desktop-generator-text placeholder="Describe your Arduino project..."></desktop-generator-text>
+                        <desktop-generator-text placeholder="Describe your Arduino project..." name="project-description"></desktop-generator-text>
                         <desktop-generator-render></desktop-generator-render>
                         <error-message></error-message>
                         <desktop-generator-output></desktop-generator-output>
                     </div>
                 `;
-                this.shadowRoot.innerHTML = template;
+                this.shadowRoot.appendChild(template.content.cloneNode(true));
             }
         }
 
         class MobileApp extends HTMLElement {
-            connectedCallback() {
-                this.text = this.getAttribute('text') || 'App';
-                this.innerHTML = `<h1>${this.text}</h1>`;
+            constructor() {
+                super();
+                const shadow = this.attachShadow({ mode: 'open' });
+                const container = document.createElement('div');
+                container.innerHTML = `<h1>${this.getAttribute('text') || 'AI Code Generator'}</h1>`;
+                shadow.appendChild(container);
             }
         }
 
         class MobileGeneratorText extends HTMLElement {
-            connectedCallback() {
-                this.placeholder = this.getAttribute('placeholder') || 'Input text...';
-                this.innerHTML = `<textarea placeholder="${this.placeholder}" style="width: 100%; height: 120px; padding: 10px;"></textarea>`;
+            constructor() {
+                super();
+                const shadow = this.attachShadow({ mode: 'open' });
+                const textarea = document.createElement('textarea');
+                textarea.placeholder = this.getAttribute('placeholder') || 'Describe your project...';
+                textarea.name = this.getAttribute('name') || 'project-description';
+                textarea.id = this.getAttribute('id') || 'textarea-id';
+                shadow.appendChild(textarea);
             }
         }
 
         class MobileGeneratorRender extends HTMLElement {
-            connectedCallback() {
-                this.innerHTML = `<button style="padding: 10px 20px; background-color: #007bff; color: white;">Generate Code</button>`;
+            constructor() {
+                super();
+                const shadow = this.attachShadow({ mode: 'open' });
+                const button = document.createElement('button');
+                button.textContent = 'Generate Code';
+                shadow.appendChild(button);
             }
         }
 
         class MobileGeneratorOutput extends HTMLElement {
-            connectedCallback() {
-                this.innerHTML = `<pre style="background: #272822; color: #f8f8f2; padding: 20px;">Generated code will appear here...</pre>`;
+            constructor() {
+                super();
+                const shadow = this.attachShadow({ mode: 'open' });
+                const pre = document.createElement('pre');
+                pre.textContent = 'Generated code will appear here...';
+                shadow.appendChild(pre);
             }
         }
 
         class DesktopApp extends HTMLElement {
-            connectedCallback() {
-                this.text = this.getAttribute('text') || 'App';
-                this.innerHTML = `<h1>${this.text}</h1>`;
+            constructor() {
+                super();
+                const shadow = this.attachShadow({ mode: 'open' });
+                const container = document.createElement('div');
+                container.innerHTML = `<h1>${this.getAttribute('text') || 'AI Code Generator'}</h1>`;
+                shadow.appendChild(container);
             }
         }
 
         class DesktopGeneratorText extends HTMLElement {
-            connectedCallback() {
-                this.placeholder = this.getAttribute('placeholder') || 'Input text...';
-                this.innerHTML = `<textarea placeholder="${this.placeholder}" style="width: 100%; height: 120px; padding: 10px;"></textarea>`;
+            constructor() {
+                super();
+                const shadow = this.attachShadow({ mode: 'open' });
+                const textarea = document.createElement('textarea');
+                textarea.placeholder = this.getAttribute('placeholder') || 'Describe your project...';
+                textarea.name = this.getAttribute('name') || 'project-description';
+                textarea.id = this.getAttribute('id') || 'textarea-id';
+                shadow.appendChild(textarea);
             }
         }
 
         class DesktopGeneratorRender extends HTMLElement {
-            connectedCallback() {
-                this.innerHTML = `<button style="padding: 10px 20px; background-color: #007bff; color: white;">Generate Code</button>`;
+            constructor() {
+                super();
+                const shadow = this.attachShadow({ mode: 'open' });
+                const button = document.createElement('button');
+                button.textContent = 'Generate Code';
+                shadow.appendChild(button);
             }
         }
 
         class DesktopGeneratorOutput extends HTMLElement {
-            connectedCallback() {
-                this.innerHTML = `<pre style="background: #272822; color: #f8f8f2; padding: 20px;">Generated code will appear here...</pre>`;
+            constructor() {
+                super();
+                const shadow = this.attachShadow({ mode: 'open' });
+                const pre = document.createElement('pre');
+                pre.textContent = 'Generated code will appear here...';
+                shadow.appendChild(pre);
             }
         }
 
@@ -128,7 +206,21 @@
 
             attributeChangedCallback(name, oldValue, newValue) {
                 if (name === 'text') {
-                    this.innerHTML = `<div style="color: #dc3545; padding: 10px; border: 1px solid #dc3545; margin-top: 10px;">${newValue}</div>`;
+                    const shadow = this.shadowRoot || this.attachShadow({ mode: 'open' });
+                    const div = document.createElement('div');
+                    div.style.color = '#dc3545';
+                    div.style.padding = '10px';
+                    div.style.border = '1px solid #dc3545';
+                    div.style.marginTop = '10px';
+                    div.textContent = newValue;
+                    shadow.innerHTML = '';
+                    shadow.appendChild(div);
+                }
+            }
+
+            connectedCallback() {
+                if (!this.shadowRoot) {
+                    this.attachShadow({ mode: 'open' });
                 }
             }
         }
@@ -146,6 +238,6 @@
     </script>
 </head>
 <body>
-    <ai-code-generator view-mode="desktop" load-model="true"></ai-code-generator>
+    <ai-code-generator load-model="true"></ai-code-generator>
 </body>
 </html>
