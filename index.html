@@ -82,7 +82,7 @@
         // Load the model.json file
         async function loadModelData() {
             try {
-                const response = await fetch('model.json'); // Adjust the path as needed
+                const response = await fetch('https://4211421036.github.io/codegenerator/ai_model/model.json'); // Adjust the path as needed
                 modelData = await response.json();
                 console.log("Model data loaded:", modelData);
             } catch (error) {
