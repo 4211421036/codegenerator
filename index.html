@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Arduino Code Generator</title>
+    <title>Smart Arduino Code Generator</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -40,6 +40,10 @@
         button:hover {
             background-color: #0056b3;
         }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
         #code-output {
             background: #272822;
             color: #f8f8f2;
@@ -60,6 +64,7 @@
             padding: 5px 10px;
             border-radius: 15px;
             margin-right: 5px;
+            margin-bottom: 5px;
             font-size: 14px;
         }
         #loading {
@@ -80,13 +85,14 @@
 </head>
 <body>
     <div class="container">
-        <h1>AI Arduino Code Generator</h1>
-        <textarea id="description" placeholder="Describe your Arduino project..."></textarea>
+        <h1>Smart Arduino Code Generator</h1>
+        <p>Describe your Arduino project, including components and functionality you want to implement.</p>
+        <textarea id="description" placeholder="Example: I want to make an LED blink every second and read temperature from a DHT11 sensor..."></textarea>
         <button id="generate-code">Generate Code</button>
-        <div id="loading">Loading model and generating code...</div>
+        <div id="loading">Analyzing and generating code...</div>
         <div id="error-message" class="error-message"></div>
         <div class="keywords" id="keywords" style="display: none;">
-            <strong>Detected Keywords:</strong>
+            <strong>Detected Components & Features:</strong>
             <div id="detected-keywords"></div>
         </div>
         <div id="code-output"></div>
@@ -122,94 +128,149 @@
             }, 5000);
         }
 
-        function detectKeywords(description) {
-            if (!modelData || !modelData.templates) {
-                return [];
-            }
-            const keywords = new Set();
-            modelData.templates.forEach(template => {
-                if (template.keywords) {
-                    template.keywords.forEach(keyword => {
-                        if (description.toLowerCase().includes(keyword.toLowerCase())) {
-                            keywords.add(keyword);
-                        }
-                    });
-                }
-            });
-            return Array.from(keywords);
+        function analyzeUserInput(description) {
+            const lowercaseDesc = description.toLowerCase();
+            const components = new Set();
+            const features = new Set();
+            
+            // Analisis komponen dasar
+            if (lowercaseDesc.includes('led')) components.add('LED');
+            if (lowercaseDesc.includes('button') || lowercaseDesc.includes('push')) components.add('Button');
+            if (lowercaseDesc.includes('dht11') || lowercaseDesc.includes('dht22')) components.add('DHT Sensor');
+            if (lowercaseDesc.includes('servo')) components.add('Servo Motor');
+            if (lowercaseDesc.includes('lcd')) components.add('LCD Display');
+            
+            // Analisis fitur
+            if (lowercaseDesc.includes('blink') || lowercaseDesc.includes('flash')) features.add('Blinking');
+            if (lowercaseDesc.includes('temperature') || lowercaseDesc.includes('humid')) features.add('Temperature Reading');
+            if (lowercaseDesc.includes('display') || lowercaseDesc.includes('show')) features.add('Display Output');
+            if (lowercaseDesc.includes('button') && (lowercaseDesc.includes('press') || lowercaseDesc.includes('push'))) features.add('Button Input');
+            
+            return { components, features };
         }
 
-        function findMatchingTemplates(keywords) {
-            if (!modelData || !modelData.templates) {
-                return [];
-            }
-            return modelData.templates.filter(template =>
-                template.keywords && template.keywords.some(keyword => keywords.includes(keyword))
-            );
-        }
-
-        function generateArduinoCode(description) {
-            if (!modelData || !modelData.templates) {
-                showError("Model data not properly loaded. Please refresh the page.");
-                return "// Error: Model data not loaded properly";
-            }
-
-            const keywords = detectKeywords(description);
-            const matchingTemplates = findMatchingTemplates(keywords);
-
-            // Update keywords display
-            const keywordsElement = document.getElementById('keywords');
-            const keywordSection = document.getElementById('detected-keywords');
-            keywordSection.innerHTML = '';
-
-            if (keywords.length === 0) {
-                keywordsElement.style.display = 'none';
-            } else {
-                keywordsElement.style.display = 'block';
-                keywords.forEach(keyword => {
-                    const chip = document.createElement('span');
-                    chip.className = 'keyword-chip';
-                    chip.textContent = keyword;
-                    keywordSection.appendChild(chip);
-                });
-            }
-
-            if (matchingTemplates.length === 0) {
-                return "// No matching templates found for your description.\n// Try using different keywords or check the documentation.";
-            }
-
+        function generateSmartCode(description) {
+            const analysis = analyzeUserInput(description);
+            let code = "// Arduino Code Generated based on your description\n\n";
+            
+            // Tambahkan libraries yang diperlukan
             const libraries = new Set();
-            const variableDeclarations = new Set();
-            let setupCode = '';
-            let loopCode = '';
-
-            matchingTemplates.forEach(template => {
-                if (template.libraries) {
-                    template.libraries.forEach(lib => libraries.add(lib));
-                }
-                if (template.variables) {
-                    template.variables.forEach(variable => variableDeclarations.add(variable));
-                }
-                if (template.functions) {
-                    template.functions.forEach(func => {
-                        if (func.name === 'setup' && func.body) {
-                            setupCode += func.body + '\n';
-                        }
-                        if (func.name === 'loop' && func.body) {
-                            loopCode += func.body + '\n';
-                        }
-                    });
-                }
+            if (analysis.components.has('DHT Sensor')) libraries.add('DHT.h');
+            if (analysis.components.has('Servo Motor')) libraries.add('Servo.h');
+            if (analysis.components.has('LCD Display')) libraries.add('LiquidCrystal.h');
+            
+            libraries.forEach(lib => {
+                code += `#include <${lib}>\n`;
             });
+            code += '\n';
 
-            let generatedCode = "// Auto-generated Arduino code\n// Generated based on your description\n\n";
-            libraries.forEach(lib => (generatedCode += `#include <${lib}>\n`));
-            generatedCode += '\n';
-            variableDeclarations.forEach(variable => (generatedCode += `${variable}\n`));
-            generatedCode += '\nvoid setup() {\n' + setupCode + '}\n\n';
-            generatedCode += 'void loop() {\n' + loopCode + '}\n';
+            // Deklarasi pin dan variabel
+            if (analysis.components.has('LED')) {
+                code += '// Pin definitions\n';
+                code += 'const int LED_PIN = 13;  // Change this to your LED pin\n';
+            }
+            if (analysis.components.has('Button')) {
+                code += 'const int BUTTON_PIN = 2;  // Change this to your button pin\n';
+            }
+            if (analysis.components.has('DHT Sensor')) {
+                code += 'const int DHT_PIN = 4;  // Change this to your DHT sensor pin\n';
+                code += '#define DHT_TYPE DHT11  // Change to DHT22 if using that sensor\n';
+                code += 'DHT dht(DHT_PIN, DHT_TYPE);\n';
+            }
+            if (analysis.components.has('Servo Motor')) {
+                code += 'Servo myservo;  // Create servo object\n';
+            }
+            if (analysis.components.has('LCD Display')) {
+                code += 'LiquidCrystal lcd(12, 11, 5, 4, 3, 2);  // Adjust pins as needed\n';
+            }
+            
+            code += '\n// Variable declarations\n';
+            if (analysis.features.has('Blinking')) {
+                code += 'unsigned long previousMillis = 0;\n';
+                code += 'const long interval = 1000;  // Interval at which to blink (milliseconds)\n';
+            }
+            
+            // Setup function
+            code += '\nvoid setup() {\n';
+            code += '  Serial.begin(9600);\n';
+            
+            if (analysis.components.has('LED')) {
+                code += '  pinMode(LED_PIN, OUTPUT);\n';
+            }
+            if (analysis.components.has('Button')) {
+                code += '  pinMode(BUTTON_PIN, INPUT_PULLUP);\n';
+            }
+            if (analysis.components.has('DHT Sensor')) {
+                code += '  dht.begin();\n';
+            }
+            if (analysis.components.has('Servo Motor')) {
+                code += '  myservo.attach(9);  // Attach servo to pin 9\n';
+            }
+            if (analysis.components.has('LCD Display')) {
+                code += '  lcd.begin(16, 2);  // Initialize 16x2 LCD\n';
+                code += '  lcd.print("Starting...");\n';
+            }
+            
+            code += '}\n\n';
 
-            return generatedCode;
+            // Loop function
+            code += 'void loop() {\n';
+            
+            if (analysis.features.has('Blinking')) {
+                code += '  unsigned long currentMillis = millis();\n\n';
+                code += '  if (currentMillis - previousMillis >= interval) {\n';
+                code += '    previousMillis = currentMillis;\n';
+                code += '    digitalWrite(LED_PIN, !digitalRead(LED_PIN));\n';
+                code += '  }\n\n';
+            }
+            
+            if (analysis.features.has('Temperature Reading')) {
+                code += '  float humidity = dht.readHumidity();\n';
+                code += '  float temperature = dht.readTemperature();\n\n';
+                code += '  if (!isnan(temperature) && !isnan(humidity)) {\n';
+                code += '    Serial.print("Temperature: ");\n';
+                code += '    Serial.print(temperature);\n';
+                code += '    Serial.print("°C  Humidity: ");\n';
+                code += '    Serial.print(humidity);\n';
+                code += '    Serial.println("%");\n';
+                
+                if (analysis.components.has('LCD Display')) {
+                    code += '    lcd.clear();\n';
+                    code += '    lcd.setCursor(0, 0);\n';
+                    code += '    lcd.print("Temp: ");\n';
+                    code += '    lcd.print(temperature);\n';
+                    code += '    lcd.setCursor(0, 1);\n';
+                    code += '    lcd.print("Humidity: ");\n';
+                    code += '    lcd.print(humidity);\n';
+                }
+                
+                code += '  }\n\n';
+            }
+            
+            if (analysis.features.has('Button Input')) {
+                code += '  if (digitalRead(BUTTON_PIN) == LOW) {\n';
+                code += '    // Button is pressed\n';
+                if (analysis.components.has('LED')) {
+                    code += '    digitalWrite(LED_PIN, HIGH);\n';
+                }
+                if (analysis.components.has('Servo Motor')) {
+                    code += '    myservo.write(180);  // Move servo to 180 degrees\n';
+                }
+                code += '    delay(50);  // Simple debounce\n';
+                code += '  } else {\n';
+                if (analysis.components.has('LED') && !analysis.features.has('Blinking')) {
+                    code += '    digitalWrite(LED_PIN, LOW);\n';
+                }
+                if (analysis.components.has('Servo Motor')) {
+                    code += '    myservo.write(0);  // Move servo back to 0 degrees\n';
+                }
+                code += '  }\n';
+            }
+            
+            code += '  delay(100);  // Small delay to prevent overwhelming the Serial output\n';
+            code += '}\n';
+
+            return { code, analysis };
         }
 
         document.getElementById('generate-code').addEventListener('click', async () => {
@@ -221,17 +282,31 @@
                 return;
             }
 
-            if (!modelData) {
-                showError("Model data not loaded yet. Please wait or refresh the page.");
-                return;
-            }
-
             isLoading = true;
             document.getElementById('loading').style.display = 'block';
             document.getElementById('generate-code').disabled = true;
 
             try {
-                const code = generateArduinoCode(description);
+                const { code, analysis } = generateSmartCode(description);
+                
+                // Update keywords display
+                const keywordsElement = document.getElementById('keywords');
+                const keywordSection = document.getElementById('detected-keywords');
+                keywordSection.innerHTML = '';
+                
+                const allItems = [...analysis.components, ...analysis.features];
+                if (allItems.length > 0) {
+                    keywordsElement.style.display = 'block';
+                    allItems.forEach(item => {
+                        const chip = document.createElement('span');
+                        chip.className = 'keyword-chip';
+                        chip.textContent = item;
+                        keywordSection.appendChild(chip);
+                    });
+                } else {
+                    keywordsElement.style.display = 'none';
+                }
+
                 document.getElementById('code-output').textContent = code;
             } catch (error) {
                 console.error("Error generating code:", error);
@@ -243,7 +318,6 @@
             }
         });
 
-        // Load model data when page loads
         window.addEventListener('load', loadModelData);
     </script>
 </body>
