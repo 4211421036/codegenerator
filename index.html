@@ -207,7 +207,7 @@
             generatedCode += '\n';
             variableDeclarations.forEach(variable => (generatedCode += ${variable}\n));
             generatedCode += '\nvoid setup() {\n' + setupCode + '}\n\n';
-            generatedCode += 'void loop() {\n' + loopCode + '}\n'`;
+            generatedCode += 'void loop() {\n' + loopCode + '}\n';`
 
             return generatedCode;
         }
