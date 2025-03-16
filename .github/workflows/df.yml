@@ -27,6 +27,17 @@ jobs:
         mkdir -p web
         echo "Directories created successfully"
 
+    - name: Check for new inputs
+      id: check-inputs
+      run: |
+        if [ -f "_site/inputs/user_input.txt" ]; then
+          echo "New input found"
+          echo "::set-output name=has_input::true"
+        else
+          echo "No new input"
+          echo "::set-output name=has_input::false"
+        fi
+
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
@@ -47,34 +58,17 @@ jobs:
         echo "Detected encodings: $ENCODINGS"
         echo "::set-output name=encodings::$ENCODINGS"
 
-    - name: Preprocess .ino files
-      id: preprocess
+    - name: Process input and generate code
+      if: steps.check-inputs.outputs.has_input == 'true'
       run: |
-        echo "Starting preprocessing..."
-        python -Xutf8 scripts/preprocess_ino.py
-        PROCESSED_FILES=$(jq '.paths | length' data/processed_data.json)
-        echo "Total processed files: $PROCESSED_FILES"
-        echo "::set-output name=processed_files::$PROCESSED_FILES"
-
-    - name: Generate new code
-      if: ${{ github.event_name == 'workflow_dispatch' || github.event.inputs.user_input }}
-      run: |
-        echo "Processing user inputs..."
-        python scripts/process_inputs.py
-        GENERATED_FILES=$(ls -1 data/outputs | wc -l)
-        echo "Generated $GENERATED_FILES new .ino files"
+        echo "Processing input..."
+        python _scripts/process_inputs.py
+        rm -f _site/inputs/user_input.txt  # Delete input after processing
 
     - name: Commit and push changes
       run: |
         git config --global user.name "GitHub Actions"
         git config --global user.email "actions@github.com"
-        git add data/
+        git add .
         git commit -m "Auto-generated code [skip ci]" || echo "No changes to commit"
         git push
-
-    - name: Deploy to GitHub Pages
-      if: ${{ github.ref == 'refs/heads/main' }}
-      uses: peaceiris/actions-gh-pages@v3
-      with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        publish_dir: ./web
