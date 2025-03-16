@@ -2,7 +2,7 @@ import os
 import pickle
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.naive_bayes import MultinomialNB
-import chardet  # Library untuk mendeteksi encoding file
+import chardet
 
 # Fungsi untuk memuat data dari folder
 def load_data(directory):
