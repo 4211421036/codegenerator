@@ -1,57 +1,35 @@
-name: Train and Deploy AI Model
+name: Generate Arduino Code
+
 on:
   schedule:
-    - cron: '0 0 * * *'
-  push:
-    branches:
-      - main
+    - cron: '*/5 * * * *'  # Setiap 5 menit
+  workflow_dispatch:
+
 jobs:
-  train-ai-model:
+  generate:
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v3
+    - uses: actions/checkout@v2
     
-    - name: Setup Node.js
-      uses: actions/setup-node@v3
+    - name: Setup Python
+      uses: actions/setup-python@v2
       with:
-        node-version: '16'
-    
+        python-version: 3.8
+        
     - name: Install dependencies
       run: |
-        npm init -y
-        npm install @tensorflow/tfjs-node
-    
-    - name: Run AI Model Training Script
-      run: node index.mjs
-    
-    - name: Debug AI Model Files
-      run: |
-        find . -name vocab.json
-        ls -l ai_model/
-        cat ai_model/model.json
-        [ -f ai_model/vocab.json ] && cat ai_model/vocab.json || echo "vocab.json not found"
-    
-    - name: Commit and push trained model
+        pip install -r requirements.txt
+        
+    - name: Preprocess Data
+      run: python scripts/preprocess_ino.py
+      
+    - name: Generate Code
+      run: python scripts/process_inputs.py
+      
+    - name: Commit Changes
       run: |
         git config --global user.name "GitHub Actions"
         git config --global user.email "actions@github.com"
-        
-        # Explicitly add all files in ai_model, including vocab.json
-        git add ai_model/model.json ai_model/weights.bin ai_model/vocab.json
-        
-        if git diff --cached --quiet; then
-          echo "No changes to commit"
-        else
-          git commit -m "Update AI model and vocabulary"
-          git push
-        fi
-    
-    - name: Upload model as artifact
-      uses: actions/upload-artifact@v3
-      with:
-        name: ai-model
-        path: |
-          ai_model/model.json
-          ai_model/weights.bin
-          ai_model/vocab.json
+        git add data/
+        git commit -m "Auto-generated code" || echo "No changes to commit"
+        git push
