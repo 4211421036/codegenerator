@@ -1,66 +1,76 @@
 name: Arduino Code Generator CI/CD
-
-on:
-  schedule:
-    - cron: '*/5 * * * *'  # Run every 5 minutes
-  workflow_dispatch:  # Manual trigger
-  push:
-    branches:
-      - main  # Trigger on push to main branch
-
-jobs:
-  generate-code:
-    runs-on: ubuntu-latest
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v3
-
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.8'
-   
-    - name: Create necessary directories
-      run: |
-        mkdir -p data/inputs
-        mkdir -p data/outputs
-        mkdir -p web
-        echo "Directories created successfully"
-
-    - name: Check for new inputs
-      id: check-inputs
-      run: |
-        if [ -f "_site/inputs/user_input.txt" ]; then
-          echo "New input found"
-          echo "::set-output name=has_input::true"
-        else
-          echo "No new input"
-          echo "::set-output name=has_input::false"
-        fi
-
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        pip install chardet==5.2.0
-        pip install scikit-learn==1.0.2
-        pip install numpy==1.22.3
-
-    - name: Verify numpy installation
-      run: |
-        python -c "import numpy as np; print(f'numpy version: {np.__version__}')"
-
-    - name: Process input and generate code
-      if: steps.check-inputs.outputs.has_input == 'true'
-      run: |
-        echo "Processing input..."
-        python _scripts/process_inputs.py
-        rm -f _site/inputs/user_input.txt  # Delete input after processing
-
-    - name: Commit and push changes
-      run: |
-        git config --global user.name "GitHub Actions"
-        git config --global user.email "actions@github.com"
-        git add .
-        git commit -m "Auto-generated code [skip ci]" || echo "No changes to commit"
-        git push
+ 
+ on:
+   schedule:
+     - cron: '*/5 * * * *'  # Run every 5 minutes
+   workflow_dispatch:  # Manual trigger
+   push:
+     branches:
+       - main  # Trigger on push to main branch
+ 
+ jobs:
+   generate-code:
+     runs-on: ubuntu-latest
+     steps:
+     - name: Checkout repository
+       uses: actions/checkout@v3
+ 
+     - name: Set up Python
+       uses: actions/setup-python@v4
+       with:
+         python-version: '3.8'
+ 
+     - name: Create necessary directories
+       run: |
+         mkdir -p data/inputs
+         mkdir -p data/outputs
+         mkdir -p web
+         echo "Directories created successfully"
+ 
+     - name: Install dependencies
+       run: |
+         python -m pip install --upgrade pip
+         pip install -r requirements.txt
+         pip install chardet==5.2.0
+         pip install scikit-learn==1.0.2
+         pip install numpy==1.22.3
+ 
+     - name: Verify numpy installation
+       run: |
+         python -c "import numpy as np; print(f'numpy version: {np.__version__}')"
+ 
+     - name: Verify encodings
+       id: check-encodings
+       run: |
+         echo "Checking file encodings..."
+         ENCODINGS=$(python scripts/check_encoding.py)
+         echo "Detected encodings: $ENCODINGS"
+         echo "::set-output name=encodings::$ENCODINGS"
+ 
+     - name: Preprocess .ino files
+       id: preprocess
+       run: |
+         echo "Starting preprocessing..."
+         python -Xutf8 scripts/preprocess_ino.py
+         PROCESSED_FILES=$(jq '.paths | length' data/processed_data.json)
+         echo "Total processed files: $PROCESSED_FILES"
+         echo "::set-output name=processed_files::$PROCESSED_FILES"
+ 
+     - name: Generate new code
+       if: ${{ github.event_name == 'workflow_dispatch' || github.event.inputs.user_input }}
+ 
+     - name: Commit and push changes
+       run: |
+         git config --global user.name "GitHub Actions"
+         git config --global user.email "actions@github.com"
+         git add data/
+         git add .
+         git commit -m "Auto-generated code [skip ci]" || echo "No changes to commit"
+         git push
+ 
+     - name: Deploy to GitHub Pages
+       if: ${{ github.ref == 'refs/heads/main' }}
+       uses: peaceiris/actions-gh-pages@v3
+       with:
+         github_token: ${{ secrets.GITHUB_TOKEN }}
+         publish_dir: ./web
