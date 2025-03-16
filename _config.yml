@@ -1,0 +1,15 @@
+# Jekyll configuration
+title: Arduino Code Generator
+description: Generate Arduino code based on user input.
+
+# Include custom data and scripts
+include:
+  - _data
+  - _scripts
+
+# Exclude unnecessary files
+exclude:
+  - Gemfile
+  - Gemfile.lock
+  - node_modules
+  - vendor
