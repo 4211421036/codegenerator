@@ -68,29 +68,19 @@ button:hover {
         <div class="output-section" id="output"></div>
     </div>
     <script type="text/javascript">
-        async function generateCode() {
+    async function generateCode() {
     const input = document.getElementById('input').value;
     const output = document.getElementById('output');
     
     output.textContent = 'Generating code...';
     
     try {
-        const repo = '4211421036/codegenerator'; // Ganti dengan repo Anda
-        const token = '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'; // Ganti dengan PAT Anda
-        
-        const response = await fetch(`https://api.github.com/repos/${repo}/dispatches`, {
+        const response = await fetch('/.netlify/functions/trigger-workflow', {
             method: 'POST',
             headers: {
-                'Authorization': `token ${token}`,
-                'Accept': 'application/vnd.github.everest-preview+json',
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
             },
-            body: JSON.stringify({
-                event_type: 'generate_code',
-                client_payload: {
-                    input: input
-                }
-            })
+            body: JSON.stringify({ input: input })
         });
         
         if (response.ok) {
