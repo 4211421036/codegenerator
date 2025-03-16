@@ -50,14 +50,6 @@ jobs:
       run: |
         python -c "import numpy as np; print(f'numpy version: {np.__version__}')"
 
-    - name: Verify encodings
-      id: check-encodings
-      run: |
-        echo "Checking file encodings..."
-        ENCODINGS=$(python scripts/check_encoding.py)
-        echo "Detected encodings: $ENCODINGS"
-        echo "::set-output name=encodings::$ENCODINGS"
-
     - name: Process input and generate code
       if: steps.check-inputs.outputs.has_input == 'true'
       run: |
