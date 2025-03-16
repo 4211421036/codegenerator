@@ -9,14 +9,17 @@ def load_data(directory):
     data = []
     labels = []
     for filename in os.listdir(directory):
+        if not filename.endswith('.ino'):  # Hanya proses file .ino
+            print(f"Skipping non-ino file: {filename}")
+            continue
         filepath = os.path.join(directory, filename)
         try:
-            with open(filepath, 'rb') as file:  # Baca file dalam mode binary
+            with open(filepath, 'rb') as file:
                 raw_data = file.read()
-                # Deteksi encoding file
                 result = chardet.detect(raw_data)
                 encoding = result['encoding']
-                # Decode file dengan encoding yang terdeteksi
+                if encoding is None:  # Jika encoding tidak terdeteksi, gunakan default
+                    encoding = 'utf-8'
                 content = raw_data.decode(encoding, errors='replace')
                 data.append(content)
                 labels.append(filename)
