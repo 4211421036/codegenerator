@@ -1,0 +1,54 @@
+name: Arduino Code Generator CI/CD
+
+on:
+  repository_dispatch:
+    types: [generate_code]
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  generate-code:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.8'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Preprocess .ino files
+      run: |
+        echo "Starting preprocessing..."
+        python -Xutf8 scripts/preprocess_ino.py
+
+    - name: Generate new code
+      env:
+        USER_INPUT: ${{ github.event.client_payload.input }}
+      run: |
+        echo "Processing user input..."
+        mkdir -p data/inputs
+        echo "$USER_INPUT" > data/inputs/user_input.txt
+        python scripts/process_inputs.py
+
+    - name: Commit and push changes
+      run: |
+        git config --global user.name "GitHub Actions"
+        git config --global user.email "actions@github.com"
+        git add data/
+        git commit -m "Auto-generated code [skip ci]" || echo "No changes to commit"
+        git push
+
+    - name: Deploy to GitHub Pages
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: ./web
