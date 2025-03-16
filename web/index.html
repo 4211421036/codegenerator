@@ -1,21 +1,17 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Arduino Code Generator</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="container">
-        <h1>Arduino Code Generator</h1>
-        <div class="input-section">
-            <textarea id="input" placeholder="Describe your Arduino project..."></textarea>
-            <button onclick="generateCode()">Generate Code</button>
-        </div>
-        <div class="output-section">
-            <h2>Generated Code</h2>
-            <pre id="generated-code">No code generated yet.</pre>
-        </div>
-    </div>
+    <h1>Arduino Code Generator</h1>
+    <textarea id="description" placeholder="Enter your description here..."></textarea>
+    <button onclick="generateCode()">Generate Code</button>
+    <pre id="output"></pre>
+
     <script src="script.js"></script>
 </body>
 </html>
