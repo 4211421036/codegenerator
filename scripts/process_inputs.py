@@ -20,6 +20,7 @@ def find_best_match(user_input, data):
     return np.argmax(similarities)
 
 def main():
+    # Load user input
     with open('data/inputs/user_input.txt', 'r', encoding='utf-8') as f:
         user_input = f.read().strip()
 
