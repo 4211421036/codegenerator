@@ -3,6 +3,9 @@ name: Generate Arduino Code
 on:
   schedule:
     - cron: '*/5 * * * *'  # Setiap 5 menit
+  push:
+    branches:
+      - main
   workflow_dispatch:
 
 jobs:
