@@ -1,6 +1,6 @@
 async function generateCode() {
     const input = document.getElementById('input').value;
-    const output = document.getElementById('output');
+    const output = document.getElementById('generated-code');
     
     output.textContent = 'Generating code...';
     
@@ -25,10 +25,21 @@ async function generateCode() {
         } else {
             const errorData = await response.json();
             output.textContent = `Error: ${errorData.message || 'Unknown error'}`;
-            console.error('API Error:', errorData);
         }
     } catch (error) {
         output.textContent = `Connection error: ${error.message}`;
-        console.error('Network Error:', error);
     }
 }
+
+async function checkGeneratedCode() {
+    const response = await fetch('outputs/generated_code.ino');
+    if (response.ok) {
+        const code = await response.text();
+        document.getElementById('generated-code').textContent = code;
+    } else {
+        document.getElementById('generated-code').textContent = 'No code generated yet.';
+    }
+}
+
+// Check for generated code every 10 seconds
+setInterval(checkGeneratedCode, 10000);
