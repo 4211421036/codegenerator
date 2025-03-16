@@ -2,4 +2,3 @@ numpy
 scikit-learn
 chardet
 jq
-pickle
