@@ -5,15 +5,11 @@ async function generateCode() {
     output.textContent = 'Generating code...';
     
     try {
-        const repo = '4211421036/codegenerator'; // Ganti dengan repo Anda
-        const token = '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'; // Ganti dengan PAT Anda
-        
         const response = await fetch(
-            `https://api.github.com/repos/${repo}/dispatches`,
+            'https://api.github.com/repos/4211421036/codegenerator/dispatches',
             {
                 method: 'POST',
                 headers: {
-                    'Authorization': `token ${token}`,
                     'Accept': 'application/vnd.github.everest-preview+json',
                     'Content-Type': 'application/json'
                 },
@@ -36,3 +32,21 @@ async function generateCode() {
         console.error('Network Error:', error);
     }
 }
+
+async function checkGeneratedCode() {
+    try {
+        const response = await fetch('outputs/generated_code.ino');
+        if (response.ok) {
+            const code = await response.text();
+            document.getElementById('generated-code').textContent = code;
+        } else {
+            document.getElementById('generated-code').textContent = 'No code generated yet.';
+        }
+    } catch (error) {
+        console.error('Error fetching generated code:', error);
+        document.getElementById('generated-code').textContent = 'Error loading generated code.';
+    }
+}
+
+// Check for generated code every 10 seconds
+setInterval(checkGeneratedCode, 10000);
