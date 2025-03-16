@@ -1,5 +1,5 @@
-scikit-learn==1.0.2
-numpy==1.22.3
-chardet==5.2.0
-jq==1.6.0
+numpy
+scikit-learn
+chardet
+jq
 pickle
