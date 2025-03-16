@@ -4,7 +4,6 @@ from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.naive_bayes import MultinomialNB
 import chardet
 
-# Fungsi untuk memuat data dari folder
 def load_data(directory):
     data = []
     labels = []
@@ -27,7 +26,6 @@ def load_data(directory):
             print(f"Error processing file {filename}: {e}")
     return data, labels
 
-# Fungsi untuk melatih model
 def train_model(data, labels):
     vectorizer = CountVectorizer()
     X = vectorizer.fit_transform(data)
@@ -35,18 +33,24 @@ def train_model(data, labels):
     model.fit(X, labels)
     return model, vectorizer
 
-# Fungsi untuk menyimpan model
 def save_model(model, vectorizer, model_dir='model'):
+    # Buat folder 'model' jika belum ada
     os.makedirs(model_dir, exist_ok=True)
+    # Simpan model dan vectorizer ke file
     with open(os.path.join(model_dir, 'trained_model.pkl'), 'wb') as f:
         pickle.dump((model, vectorizer), f)
+    print(f"Model saved to {os.path.join(model_dir, 'trained_model.pkl')}")
 
-# Main function
 if __name__ == "__main__":
     # Memuat data dari folder arduino_code
     data, labels = load_data('../arduino_code')
+    
     # Melatih model
-    model, vectorizer = train_model(data, labels)
-    # Menyimpan model
-    save_model(model, vectorizer)
-    print("Model training completed and saved!")
+    if not data:
+        print("No valid .ino files found in the arduino_code folder.")
+    else:
+        model, vectorizer = train_model(data, labels)
+        
+        # Menyimpan model
+        save_model(model, vectorizer)
+        print("Model training completed and saved!")
