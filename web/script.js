@@ -6,7 +6,7 @@ async function generateCode() {
     
     try {
         const repo = '4211421036/codegenerator'; // Ganti dengan repo Anda
-        const token = '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'; // Ganti dengan PAT Anda
+        const token = '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'; // Ganti dengan PAT Anda
         
         const response = await fetch(
             `https://api.github.com/repos/${repo}/dispatches`,
