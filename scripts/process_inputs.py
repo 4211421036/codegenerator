@@ -34,9 +34,9 @@ def main():
     with open(data['paths'][best_idx], 'r', encoding='utf-8') as f:
         generated_code = f.read()
 
-    # Save output
-    os.makedirs('data/outputs', exist_ok=True)
-    with open('data/outputs/generated_code.ino', 'w', encoding='utf-8') as f:
+    # Save output to web/ for GitHub Pages
+    os.makedirs('web/outputs', exist_ok=True)
+    with open('web/outputs/generated_code.ino', 'w', encoding='utf-8') as f:
         f.write(generated_code)
 
     print("Code generated successfully!")
