@@ -1,6 +1,17 @@
 import os
 import json
+import numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer
+
+def numpy_serializer(obj):
+    """Custom serializer for numpy data types"""
+    if isinstance(obj, (np.int64, np.int32)):
+        return int(obj)
+    elif isinstance(obj, np.float64):
+        return float(obj)
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+    raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
 
 def extract_description(code):
     comments = []
@@ -32,7 +43,7 @@ def main():
     vectorizer.fit_transform(descriptions)
 
     data = {
-        'vocab': vectorizer.vocabulary_,
+        'vocab': {k: int(v) for k, v in vectorizer.vocabulary_.items()},
         'idf': vectorizer.idf_.tolist(),
         'paths': paths,
         'descriptions': descriptions
@@ -40,7 +51,7 @@ def main():
 
     os.makedirs('data', exist_ok=True)
     with open('data/processed_data.json', 'w', encoding='utf-8') as f:
-        json.dump(data, f, ensure_ascii=False)
+        json.dump(data, f, ensure_ascii=False, default=numpy_serializer)
 
     print(f"Successfully processed {len(paths)} files")
 
