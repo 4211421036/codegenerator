@@ -1,100 +1,223 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
+
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Arduino Code Generator</title>
     <style>
         body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: #f0f2f5;
-    margin: 0;
-    padding: 20px;
-}
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            background-color: #f4f4f9;
+            margin: 0;
+            padding: 20px;
+        }
 
-.container {
-    max-width: 800px;
-    margin: 0 auto;
-    background: white;
-    padding: 30px;
-    border-radius: 10px;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-}
+        .container {
+            width: 100%;
+            max-width: 800px;
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
 
-.input-section {
-    margin-bottom: 30px;
-}
+        h1 {
+            color: #4caf50;
+            text-align: center;
+        }
 
-textarea {
-    width: 100%;
-    height: 150px;
-    padding: 15px;
-    border: 2px solid #e0e0e0;
-    border-radius: 8px;
-    font-size: 16px;
-    margin-bottom: 15px;
-    resize: vertical;
-}
+        textarea,
+        button,
+        pre {
+            margin: 10px 0;
+            padding: 10px;
+            font-size: 16px;
+            width: 100%;
+            box-sizing: border-box;
+        }
 
-button {
-    background: #007bff;
-    color: white;
-    border: none;
-    padding: 12px 25px;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 16px;
-    transition: background 0.3s;
-}
+        textarea {
+            height: 100px;
+            resize: vertical;
+        }
 
-button:hover {
-    background: #0056b3;
-}
+        button {
+            background-color: #4caf50;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
 
-.output-section {
-    background: #f8f9fa;
-    padding: 20px;
-    border-radius: 8px;
-    white-space: pre-wrap;
-    font-family: monospace;
-}
+        button:hover {
+            background-color: #45a049;
+        }
+
+        pre {
+            background-color: #222;
+            color: white;
+            overflow-x: auto;
+            border-radius: 8px;
+            max-height: 400px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+
+        .thinking {
+            font-style: italic;
+            color: #777;
+        }
     </style>
 </head>
+
 <body>
     <div class="container">
-        <h1>🤖 Arduino Code Generator</h1>
-        <div class="input-section">
-            <textarea id="input" placeholder="Describe your Arduino project..."></textarea>
-            <button onclick="generateCode()">Generate Code</button>
-        </div>
-        <div class="output-section" id="output"></div>
+        <h1>Arduino Code Generator</h1>
+        <textarea id="userInput" placeholder="Describe your Arduino project..."></textarea>
+        <button id="generateButton">Generate Code</button>
+        <pre id="outputCode">Arduino code will appear here...</pre>
+        <p id="thinkingText" class="thinking"></p>
     </div>
-    <script type="text/javascript">
-    async function generateCode() {
-    const input = document.getElementById('input').value;
-    const output = document.getElementById('output');
-    
-    output.textContent = 'Generating code...';
-    
-    try {
-        const response = await fetch('/.netlify/functions/trigger-workflow', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ input: input })
-        });
-        
-        if (response.ok) {
-            output.textContent = 'Code generation started! Check back in 5 minutes.';
-        } else {
-            const errorData = await response.json();
-            output.textContent = `Error: ${errorData.message || 'Unknown error'}`;
-            console.error('API Error:', errorData);
-        }
-    } catch (error) {
-        output.textContent = `Connection error: ${error.message}`;
-        console.error('Network Error:', error);
-    }
+
+    <script>
+        class ArduinoCodeGenerator {
+            constructor() {
+                this.model = null;
+                this.vocab = null;
+            }
+
+            async loadModelAndVocab() {
+                try {
+                    const [modelResponse, vocabResponse] = await Promise.all([
+                        fetch('https://4211421036.github.io/codegenerator/ai_model/model.json'),
+                        fetch('https://4211421036.github.io/codegenerator/ai_model/vocab.json')
+                    ]);
+
+                    this.model = await modelResponse.json();
+                    this.vocab = await vocabResponse.json();
+                    console.log("Model and Vocab successfully loaded.");
+                } catch (error) {
+                    console.error("Failed to load model or vocab:", error);
+                }
+            }
+
+            generateBaseTemplate() {
+                return `void setup() {
+  Serial.begin(9600);
+  // Add pin configurations here
 }
+
+void loop() {
+  // Add your main code logic here
+}`;
+            }
+
+            generateCodeFromInput(input) {
+                // Basic AI-assisted code generation logic
+                if (!this.model || !this.vocab) {
+                    return "Model or vocabulary not loaded.";
+                }
+
+                let generatedCode = this.generateBaseTemplate();
+
+                // Augment base template based on input and model
+                const keywords = this.extractKeywords(input);
+
+                keywords.forEach(keyword => {
+                    if (this.model.pinConfigurations && this.model.pinConfigurations[keyword]) {
+                        generatedCode = this.updatePinConfiguration(generatedCode, keyword);
+                    }
+
+                    if (this.model.functionTemplates && this.model.functionTemplates[keyword]) {
+                        generatedCode = this.addFunctionTemplate(generatedCode, keyword);
+                    }
+                });
+
+                return generatedCode;
+            }
+
+            extractKeywords(input) {
+                const commonArduinoKeywords = [
+                    'led', 'sensor', 'motor', 'button', 'relay',
+                    'temperature', 'humidity', 'light', 'sound'
+                ];
+
+                return commonArduinoKeywords.filter(keyword =>
+                    input.toLowerCase().includes(keyword)
+                );
+            }
+
+            updatePinConfiguration(code, keyword) {
+                const pinConfig = this.model.pinConfigurations[keyword];
+                const setupRegex = /(Serial\.begin\(9600\);)\n/;
+                return code.replace(setupRegex, `$1\n  pinMode(${pinConfig.pin}, ${pinConfig.mode});\n`);
+            }
+
+            addFunctionTemplate(code, keyword) {
+                const functionTemplate = this.model.functionTemplates[keyword];
+                const loopRegex = /void loop\(\) {\n\s*\/\/ Add your main code logic here\n}/;
+                return code.replace(loopRegex, `void loop() {\n  ${functionTemplate}\n}`);
+            }
+        }
+
+        const codeGenerator = new ArduinoCodeGenerator();
+
+        async function generateCode() {
+            const inputText = document.getElementById('userInput').value;
+            const outputField = document.getElementById('outputCode');
+            const thinkingText = document.getElementById('thinkingText');
+
+            if (!inputText) {
+                alert("Please enter a project description.");
+                return;
+            }
+
+            try {
+                if (!codeGenerator.model) {
+                    await codeGenerator.loadModelAndVocab();
+                }
+
+                // Simulate thinking animation
+                thinkingText.textContent = "Thinking... Please wait...";
+                outputField.textContent = ""; // Clear previous output
+
+                // Simulate typing animation
+                setTimeout(async () => {
+                    const arduinoCode = codeGenerator.generateCodeFromInput(inputText);
+                    outputField.textContent = "";
+                    let i = 0;
+                    const typingSpeed = 50; // milliseconds between typing each character
+
+                    function typeCharacter() {
+                        if (i < arduinoCode.length) {
+                            outputField.textContent += arduinoCode.charAt(i);
+                            i++;
+                            setTimeout(typeCharacter, typingSpeed);
+                        } else {
+                            thinkingText.textContent = ""; // Clear thinking text after completion
+                        }
+                    }
+
+                    typeCharacter(); // Start the typing animation
+                }, 1500); // Simulate the thinking delay before typing starts
+
+            } catch (error) {
+                console.error("Error generating code:", error);
+                outputField.textContent = "An error occurred while generating code.";
+                thinkingText.textContent = "";
+            }
+        }
+
+        document.getElementById('generateButton').addEventListener('click', generateCode);
+        codeGenerator.loadModelAndVocab();
     </script>
 </body>
+
 </html>
