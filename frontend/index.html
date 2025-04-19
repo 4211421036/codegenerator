@@ -1,0 +1,29 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Arduino AI Generator</title>
+</head>
+<body>
+  <h1>Arduino AI Code Generator</h1>
+  <p>Masukkan instruksi Arduino Anda, lalu klik tombol di bawah ini. Prompt akan dikirim ke GitHub Actions untuk diproses.</p>
+  <p><strong>Langkah:</strong></p>
+  <ol>
+    <li>Salin instruksi di bawah ini</li>
+    <li>Buka <a href="https://github.com/4211421036/codegenerator/actions/workflows/frontend_submit.yml" target="_blank">Halaman Workflow</a></li>
+    <li>Paste dan jalankan workflow untuk hasilnya</li>
+  </ol>
+  <textarea id="userInput" rows="10" cols="50" placeholder="Contoh: Buat program Arduino untuk membaca sensor suhu dan menampilkan di OLED."></textarea><br>
+  <button onclick="copyPrompt()">📋 Salin Prompt</button>
+  <p id="status"></p>
+  <script>
+    function copyPrompt() {
+      const textArea = document.getElementById("userInput");
+      textArea.select();
+      document.execCommand("copy");
+      document.getElementById("status").textContent = "✅ Prompt disalin ke clipboard!";
+    }
+  </script>
+</body>
+</html>
