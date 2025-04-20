@@ -1,0 +1,36 @@
+
+name: Generate Arduino Code
+
+on:
+  repository_dispatch:
+    types: [generate-arduino-code]
+
+jobs:
+  run-model:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies
+        run: |
+          pip install torch
+
+      - name: Run Arduino generator
+        env:
+          PROMPT: ${{ github.event.client_payload.prompt }}
+        run: |
+          python backend/generate.py "$PROMPT"
+
+      - name: Commit generated files
+        run: |
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add output/*
+          git commit -m "Generated Arduino code"
+          git push

@@ -1,0 +1,17 @@
+
+name: Submit Prompt
+
+on:
+  workflow_dispatch:
+    inputs:
+      prompt:
+        description: 'Arduino prompt'
+        required: true
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call repository_dispatch
+        run: |
+          curl -X POST https://api.github.com/repos/4211421036/codegenerator/dispatches             -H "Accept: application/vnd.github.everest-preview+json"             -H "Authorization: token ${{ secrets.DISPATCH_TOKEN }}"             --data '{"event_type": "generate-arduino-code", "client_payload": {"prompt": "${{ github.event.inputs.prompt }}"}}'
