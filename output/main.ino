@@ -1,6 +1,6 @@
 // main.ino
 #include <Wire.h>
-#include "sensor.h"
+#include "module.h"
 
 void setup() {
   Serial.begin(9600);
