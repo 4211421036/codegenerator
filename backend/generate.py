@@ -1,35 +1,45 @@
-
 import sys
-import torch
 from pathlib import Path
-from zipfile import ZipFile
 
-prompt = sys.argv[1]
+def simulate_arduino_generation(prompt: str):
+    cpp_code = f"""// sensor.cpp
+#include "sensor.h"
+#include <Wire.h>
+#include <Adafruit_SSD1306.h>
 
-# Load model
-model = torch.load("model/arduino_model.pt_best.pt", map_location="cpu")
-model.eval()
+// Inisialisasi fungsi
+void tampilkanSuhu(float suhu) {{
+  // logika tampilkan suhu di OLED
+}}"""
+    h_code = """// sensor.h
+#ifndef SENSOR_H
+#define SENSOR_H
 
-# Dummy output (replace this with your actual model logic)
-with torch.no_grad():
-    result = model(prompt) if callable(model) else "// Model inference result here\n"
+void tampilkanSuhu(float suhu);
 
-# Create output folder
-Path("output").mkdir(exist_ok=True)
+#endif"""
+    ino_code = f"""// main.ino
+#include <Wire.h>
+#include "sensor.h"
 
-# Create files with comments
-with open("output/main.ino", "w") as f:
-    f.write("// main.ino - fungsi utama Arduino\n")
-    f.write(result)
+void setup() {{
+  Serial.begin(9600);
+}}
 
-with open("output/module.h", "w") as f:
-    f.write("// module.h - deklarasi fungsi\n")
+void loop() {{
+  float suhu = 25.0; // Contoh suhu
+  tampilkanSuhu(suhu);
+  delay(1000);
+}}"""
+    return cpp_code, h_code, ino_code
 
-with open("output/module.cpp", "w") as f:
-    f.write("// module.cpp - implementasi fungsi\n")
+if __name__ == '__main__':
+    prompt_file = sys.argv[1]
+    output_dir = Path(sys.argv[2])
+    prompt = Path(prompt_file).read_text()
 
-# Zip the output files
-with ZipFile("output/kode.zip", "w") as zipf:
-    zipf.write("output/main.ino", arcname="main.ino")
-    zipf.write("output/module.h", arcname="module.h")
-    zipf.write("output/module.cpp", arcname="module.cpp")
+    cpp, h, ino = simulate_arduino_generation(prompt)
+
+    (output_dir / "sensor.cpp").write_text(cpp)
+    (output_dir / "sensor.h").write_text(h)
+    (output_dir / "main.ino").write_text(ino)
