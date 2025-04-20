@@ -1,17 +1,24 @@
-
-name: Submit Prompt
+name: Submit Prompt to Trigger Backend
 
 on:
   workflow_dispatch:
     inputs:
       prompt:
-        description: 'Arduino prompt'
+        description: 'Masukkan prompt untuk generate kode Arduino'
         required: true
+        default: 'Buat program Arduino untuk membaca sensor suhu dan menampilkan di OLED.'
 
 jobs:
   trigger:
     runs-on: ubuntu-latest
+
     steps:
+      - name: Install jq
+        run: sudo apt-get install jq
+
       - name: Call repository_dispatch
         run: |
-          curl -X POST https://api.github.com/repos/4211421036/codegenerator/dispatches             -H "Accept: application/vnd.github.everest-preview+json"             -H "Authorization: token ${{ secrets.DISPATCH_TOKEN }}"             --data '{"event_type": "generate-arduino-code", "client_payload": {"prompt": "${{ github.event.inputs.prompt }}"}}'
+          curl -X POST https://api.github.com/repos/${{ github.repository }}/dispatches \
+            -H "Accept: application/vnd.github.everest-preview+json" \
+            -H "Authorization: token ${{ secrets.DISPATCH_TOKEN }}" \
+            --data "$(jq -n --arg prompt '${{ github.event.inputs.prompt }}' '{event_type:"generate-arduino-code", client_payload:{prompt:$prompt}}')"
